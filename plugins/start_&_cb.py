@@ -375,8 +375,8 @@ async def start(client, message: Message):
             InlineKeyboardButton(text="ᴇ", callback_data="shortlink_info")  # E
         ],
         [
-            InlineKeyboardButton('ᴜᴘᴅᴀᴛᴇs', url= "https://t.me/mymopies"),
-            InlineKeyboardButton('sᴜᴘᴘᴏʀᴛ', url= "https://t.me/mymopies")
+            InlineKeyboardButton('ᴜᴘᴅᴀᴛᴇs', url= "https://t.me/TFIBOTS"),
+            InlineKeyboardButton('sᴜᴘᴘᴏʀᴛ', url= "https://t.me/TFIBOTS_SUPPORT")
         ],
         [
             InlineKeyboardButton('ᴀʙᴏᴜᴛ', callback_data='about'),
