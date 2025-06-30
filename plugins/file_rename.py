@@ -1776,62 +1776,69 @@ async def renamed_filter_callback(client, callback_query):
     except Exception as e:
         await callback_query.answer(f"Error: {str(e)}", show_alert=True)
         logger.error(f"Callback error: {e}", exc_info=True)
+        
 @Client.on_message(filters.command("info") & (filters.group | filters.private))
 @check_ban_status
-async def premium_system_info(client, message: Message):
+async def bot_info(client, message: Message):
     try:
-        # Get basic stats
+        # Get user statistics
         total_users = await DARKXSIDE78.col.count_documents({})
         active_users = await DARKXSIDE78.col.count_documents({
             "last_active": {"$gte": datetime.now() - timedelta(days=30)}
         })
 
-        # System info
-        cpu = psutil.cpu_percent()
-        mem = psutil.virtual_memory()
-        disk = psutil.disk_usage('/')
+        # Get rename statistics
+        rename_stats = await DARKXSIDE78.col.aggregate([
+            {"$group": {
+                "_id": None,
+                "total_renames": {"$sum": "$rename_count"},
+                "total_size": {"$sum": "$total_renamed_size"}
+            }}
+        ]).to_list(1)
         
-        # Uptime
-        uptime = datetime.now() - datetime.fromtimestamp(psutil.boot_time())
+        if not rename_stats:
+            rename_stats = [{"total_renames": 0, "total_size": 0}]
+
+        # System performance metrics
+        cpu = psutil.cpu_percent()
+        ram = psutil.virtual_memory().percent
+        disk = psutil.disk_usage('/').percent
+
+        # Uptime calculations
+        system_uptime = datetime.now() - datetime.fromtimestamp(psutil.boot_time())
         bot_uptime = datetime.now() - datetime.fromtimestamp(psutil.Process().create_time())
 
-        # Network
-        net1 = psutil.net_io_counters()
-        await asyncio.sleep(1)
-        net2 = psutil.net_io_counters()
-        upload = (net2.bytes_sent - net1.bytes_sent) / 1024
-        download = (net2.bytes_recv - net1.bytes_recv) / 1024
-
+        # Format the response message
         response = f"""
-⚡ <b>Bot Performance Stats</b> ⚡
+<b>🤖 Bot Performance Information</b>
 
-<b>Users:</b>
-├ Total: {total_users:,}
-└ Active (30d): {active_users:,}
+📊 <u>User Statistics</u>
+├ Total Users: <code>{total_users:,}</code>
+└ Active (30d): <code>{active_users:,}</code>
 
-<b>System:</b>
-├ CPU: {cpu:.1f}%
-├ RAM: {mem.percent:.1f}%
-└ Disk: {disk.percent:.1f}%
+🔄 <u>Rename Statistics</u>
+├ Total Files Renamed: <code>{rename_stats[0]['total_renames']:,}</code>
+└ Total Storage Processed: <code>{humanbytes(rename_stats[0]['total_size'])}</code>
 
-<b>Network:</b>
-├ ▲ {upload:.1f} KB/s
-└ ▼ {download:.1f} KB/s
+⚙️ <u>System Resources</u>
+├ CPU Usage: <code>{cpu:.1f}%</code>
+├ RAM Usage: <code>{ram:.1f}%</code>
+└ Disk Usage: <code>{disk:.1f}%</code>
 
-<b>Uptime:</b>
-├ System: {uptime.days}d {uptime.seconds//3600}h
-└ Bot: {bot_uptime.days}d {bot_uptime.seconds//3600}h
+⏱️ <u>Uptime</u>
+├ System: <code>{system_uptime.days} days</code>
+└ Bot: <code>{bot_uptime.days} days</code>
 
-<code>@{Config.BOT_USERNAME}</code>
+<code>Bot ID: @{Config.BOT_USERNAME}</code>
 """
-        msg = await message.reply(response)
-        await asyncio.sleep(30)
+        # Send and auto-delete the message
+        msg = await message.reply_text(response, disable_web_page_preview=True)
+        await asyncio.sleep(30)  # Show for 30 seconds
         await msg.delete()
 
     except Exception as e:
-        logger.error(f"Info command error: {e}", exc_info=True)
-        await message.reply(f"⚠️ Error: {str(e)}")
-
+        logger.error(f"Info command error: {str(e)}", exc_info=True)
+        await message.reply_text(f"⚠️ Error generating stats: {str(e)}")
 @Client.on_message(filters.command("set_pdf_banner_place"))
 @check_ban_status
 async def set_pdf_banner_place_cmd(client, message: Message):
