@@ -14,7 +14,7 @@ class Config(object):
  
     BOT_UPTIME  = time.time()
     START_PIC   = os.environ.get("START_PIC", "https://files.catbox.moe/yly8lj.jpg")
-    START_STICKER   = "CAACAgUAAyEFAASONkiwAAIobmghgWh1PzfN_0CMpqZNDsZoiOMWAAJpEAACa-SZVs35WyqGBDw7NgQ"
+    START_STICKER   = "CAACAgUAAxkBAAEM6M9oYj65EbUcQmXuCIf9KRhJFzj31AAC8w4AAmjvEFeX9xEJreldPB4E"
     FORCE_PIC   = os.environ.get("FORCE_PIC", "https://files.catbox.moe/3mtgb2.jpg")
     ADMINS       = [int(admins) if id_pattern.search(admins) else admins for admins in os.environ.get('ADMINS', '1047253913').split()]
     ADMIN       = [int(admin) if id_pattern.search(admin) else admin for admin in os.environ.get('ADMIN', '1047253913').split()]
