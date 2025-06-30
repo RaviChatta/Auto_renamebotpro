@@ -353,25 +353,26 @@ async def start(client, message: Message):
 
     await DARKXSIDE78.add_user(client, message)
 
-    m = await message.reply_text("ᴏɴᴇᴇ-ᴄʜᴀɴ!, ʜᴏᴡ ᴀʀᴇ ʏᴏᴜ \nᴡᴀɪᴛ ᴀ ᴍᴏᴍᴇɴᴛ. . .")
-    await asyncio.sleep(0.4)
-    await m.edit_text("🎊")
+    m = await message.reply_text("𝙏𝙝𝙚 𝙈𝙤𝙣𝙖𝙧𝙘𝙝 𝙞𝙨 𝙖𝙬𝙖𝙠𝙚𝙣𝙞𝙣𝙜...")
+    await asyncio.sleep(0.6)
+    await m.edit_text("🌑 𝙎𝙝𝙖𝙙𝙤𝙬𝙨 𝙖𝙧𝙚 𝙨𝙩𝙞𝙧𝙧𝙞𝙣𝙜...")
     await asyncio.sleep(0.5)
-    await m.edit_text("⚡")
+    await m.edit_text("👣 𝙃𝙞𝙨 𝙛𝙤𝙤𝙩𝙨𝙩𝙚𝙥𝙨 𝙚𝙘𝙝𝙤 𝙞𝙣 𝙩𝙝𝙚 𝙙𝙖𝙧𝙠𝙣𝙚𝙨𝙨...")
     await asyncio.sleep(0.5)
-    await m.edit_text("ꜱᴛᴀʀᴛɪɴɢ...")
-    await asyncio.sleep(0.4)
+    await m.edit_text("⚔️ 𝙎𝙪𝙣𝙜 𝙅𝙞𝙣-𝙒𝙤𝙤 𝙝𝙖𝙨 𝙖𝙧𝙧𝙞𝙫𝙚𝙙.")
+    await asyncio.sleep(0.5)
     await m.delete()
+
 
     await message.reply_sticker(Config.START_STICKER)
 
     buttons = InlineKeyboardMarkup([
         [   # A R I S E row at the top
-            InlineKeyboardButton(text="🅰", callback_data="start"),       # A
-            InlineKeyboardButton(text="🆁", callback_data="group_info"),  # R
-            InlineKeyboardButton(text="🅸", callback_data="about"),       # I
-            InlineKeyboardButton(text="🆂", callback_data="main"),        # S
-            InlineKeyboardButton(text="🅴", callback_data="shortlink_info")  # E
+            InlineKeyboardButton(text="ᴀ", callback_data="start"),       # A
+            InlineKeyboardButton(text="ʀ", callback_data="group_info"),  # R
+            InlineKeyboardButton(text="ɪ", callback_data="about"),       # I
+            InlineKeyboardButton(text="ꜱ", callback_data="main"),        # S
+            InlineKeyboardButton(text="ᴇ", callback_data="shortlink_info")  # E
         ],
         [
             InlineKeyboardButton('ᴜᴘᴅᴀᴛᴇs', url= "https://t.me/mymopies"),
