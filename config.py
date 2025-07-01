@@ -109,10 +109,10 @@ class Txt(object):
     
     THUMBNAIL_TXT = """<b><u>» ᴛᴏ ꜱᴇᴛ ᴄᴜꜱᴛᴏᴍ ᴛʜᴜᴍʙɴᴀɪʟ</u></b>
     
-➲ /start: ꜱᴇɴᴅ ᴀɴʏ ᴘʜᴏᴛᴏ ᴛᴏ ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ ꜱᴇᴛ ɪᴛ ᴀꜱ ᴀ ᴛʜᴜᴍʙɴᴀɪʟ.
-➲ /del_thumb: ᴜꜱᴇ ᴛʜɪꜱ ᴄᴏᴍᴍᴀɴᴅ ᴛᴏ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴏʟᴅ ᴛʜᴜᴍʙɴᴀɪʟ.
-➲ /view_thumb: ᴜꜱᴇ ᴛʜɪꜱ ᴄᴏᴍᴍᴀɴᴅ ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴛʜᴜᴍʙɴᴀɪʟ.
-➲ /get_thumb: ᴜsᴇ ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ᴛᴏ ᴇxᴛʀᴀᴄᴛ ᴛʜᴜᴍʙɴᴀɪʟ ғʀᴏᴍ ᴏᴛʜᴇʀ ᴠɪᴅᴇᴏs ᴏʀ ᴅᴏᴄ.
+➲ </code>/start</code>: ꜱᴇɴᴅ ᴀɴʏ ᴘʜᴏᴛᴏ ᴛᴏ ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ ꜱᴇᴛ ɪᴛ ᴀꜱ ᴀ ᴛʜᴜᴍʙɴᴀɪʟ.
+➲ </code>/del_thumb</code>: ᴜꜱᴇ ᴛʜɪꜱ ᴄᴏᴍᴍᴀɴᴅ ᴛᴏ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴏʟᴅ ᴛʜᴜᴍʙɴᴀɪʟ.
+➲ </code>/view_thumb</code>: ᴜꜱᴇ ᴛʜɪꜱ ᴄᴏᴍᴍᴀɴᴅ ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴛʜᴜᴍʙɴᴀɪʟ.
+➲ </code>/get_thumb</code>: ᴜsᴇ ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ᴛᴏ ᴇxᴛʀᴀᴄᴛ ᴛʜᴜᴍʙɴᴀɪʟ ғʀᴏᴍ ᴏᴛʜᴇʀ ᴠɪᴅᴇᴏs ᴏʀ ᴅᴏᴄ.
 
 ɴᴏᴛᴇ: ɪꜰ ɴᴏ ᴛʜᴜᴍʙɴᴀɪʟ ꜱᴀᴠᴇᴅ ɪɴ ʙᴏᴛ ᴛʜᴇɴ, ɪᴛ ᴡɪʟʟ ᴜꜱᴇ ᴛʜᴜᴍʙɴᴀɪʟ ᴏꜰ ᴛʜᴇ ᴏʀɪɢɪɴɪᴀʟ ꜰɪʟᴇ ᴛᴏ ꜱᴇᴛ ɪɴ ʀᴇɴᴀᴍᴇᴅ ꜰɪʟᴇ"""
 
@@ -123,9 +123,9 @@ class Txt(object):
 ᴅᴜʀᴀᴛɪᴏɴ: {duration}
 ꜰɪʟᴇɴᴀᴍᴇ: {filename}
 
-➲ /set_caption: ᴛᴏ ꜱᴇᴛ ᴀ ᴄᴜꜱᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ.
-➲ /see_caption: ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ᴄᴜꜱᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ.
-➲ /del_caption: ᴛᴏ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴄᴜꜱᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ.
+➲ </code>/set_caption</code>: ᴛᴏ ꜱᴇᴛ ᴀ ᴄᴜꜱᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ.
+➲ </code>/see_caption</code>: ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ᴄᴜꜱᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ.
+➲ </code>/del_caption</code>: ᴛᴏ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴄᴜꜱᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ.
 
 » ꜰᴏʀ ᴇx:- /set_caption ꜰɪʟᴇ ɴᴀᴍᴇ: {filesize}"""
 
@@ -189,7 +189,7 @@ Pʀɪᴄɪɴɢ:
 
 ➲ /autorename: ᴀᴜᴛᴏ ʀᴇɴᴀᴍᴇ ʏᴏᴜʀ ꜰɪʟᴇꜱ.
 ➲ /ssequence: sᴛᴀʀᴛ sᴇǫᴜᴇɴᴄᴇ.
-➲ /ssequence: ᴇɴᴅ sᴇǫᴜᴇɴᴄᴇ.
+➲ /esequence: ᴇɴᴅ sᴇǫᴜᴇɴᴄᴇ.
 ➲ /refer: ᴛᴏ ɢᴇᴛ ʏᴏᴜʀ ʀᴇғᴇʀ ʟɪɴᴋ ᴀɴᴅ ᴄʜᴇᴄᴋ ʏᴏᴜʀ ʀᴇғᴇʀ ᴄᴏᴜɴᴛ.
 ➲ /gentoken: ᴛᴏ ɢᴇɴᴇʀᴀᴛᴇ ᴛᴏᴋᴇɴ ʟɪɴᴋ.
 ➲ /bal: ᴛᴏ ᴄʜᴇᴄᴋ ʀᴇᴍᴀɪɴɪɴɢ ᴛᴏᴋᴇɴs.
@@ -259,40 +259,40 @@ Pʀɪᴄɪɴɢ:
  
 
 **ᴄᴏᴍᴍᴀɴᴅꜱ ᴛᴏ ᴛᴜʀɴ ᴏɴ ᴏғғ ᴍᴇᴛᴀᴅᴀᴛᴀ:**
-➜ /metadata: Turn on or off metadata.
+➜ </code>/metadata</code>: Turn on or off metadata.
 
 **ᴄᴏᴍᴍᴀɴᴅꜱ ᴛᴏ ꜱᴇᴛ ᴍᴇᴛᴀᴅᴀᴛᴀ:**
 
-➜ /settitle: Set a custom title of media.
-➜ /setauthor: Set the author.
-➜ /setartist: Set the artist.
-➜ /setaudio: Set audio title.
-➜ /setsubtitle: Set subtitle title.
-➜ /setvideo: Set video title.
-➜ /setencoded_by: Set encoded by title.
-➜ /setcustom_tag: Set custom tag title.
-➜ /setcomment: Set comment title.
+➜ </code>/settitle</code>: Set a custom title of media.
+➜ </code>/setauthor</code>: Set the author.
+➜ </code>/setartist</code>: Set the artist.
+➜ </code>/setaudio</code>: Set audio title.
+➜ </code>/setsubtitle</code>: Set subtitle title.
+➜ </code>/setvideo</code>: Set video title.
+➜ </code>/setencoded_by</code>: Set encoded by title.
+➜ </code>/setcustom_tag</code>: Set custom tag title.
+➜ </code>/setcomment</code>: Set comment title.
 
-**ᴇxᴀᴍᴘʟᴇ:** /settitle Your Title Here
+**ᴇxᴀᴍᴘʟᴇ:** </code>/settitle</code> Your Title Here
 
 **ᴜꜱᴇ ᴛʜᴇꜱᴇ ᴄᴏᴍᴍᴀɴᴅꜱ ᴛᴏ ᴇɴʀɪᴄʜ ʏᴏᴜʀ ᴍᴇᴅɪᴀ ᴡɪᴛʜ ᴀᴅᴅɪᴛɪᴏɴᴀʟ ᴍᴇᴛᴀᴅᴀᴛᴀ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ!**
 """
     PDF_TXT = """
-➲ /pdfmode: ᴛᴏ sᴇᴇ ᴀʟʟ ᴘᴅғ ʀᴇʟᴀᴛᴇᴅ sᴇᴛᴛɪɴɢs.
-➲ /pdf_replace: ᴛᴏ ʀᴇᴘʟᴀᴄᴇ ᴘᴅғ ᴘᴀɢᴇs ᴡɪᴛʜ ʏᴏᴜʀ ʙᴀɴɴᴇʀ.
-➲ /pdf_extractor: ᴛᴏ ᴇxᴛʀᴀᴄᴛ ғɪʀsᴛ ᴀɴᴅ ʟᴀsᴛ ᴘᴀɢᴇs ᴏғ ᴘᴅғ.
-➲ /pdf_add: ᴛᴏ ᴀᴅᴅ ʏᴏᴜʀ ʙᴀɴɴᴇʀ ɪɴ ᴘᴅғ.
-➲ /pdf_remove: ᴛᴏ ʀᴇᴍᴏᴠᴇ ᴘᴀɢᴇs ғʀᴏᴍ ᴘᴅғ.
-➲ /set_pdf_lock: ᴛᴏ sᴇᴛ ʏᴏᴜʀ ᴘᴅғ ʟᴏᴄk (ᴅᴇғᴀᴜʟᴛ).
-➲ /pdf_lock:ᴛᴏ ʟᴏᴄᴋ ᴘᴅғ ᴡɪᴛʜ ᴘᴀssᴡᴏʀᴅ sᴇᴛ ʙʏ ʏᴏᴜ ᴏʀ ᴀɴʏ ᴘᴀssᴡᴏʀᴅ ᴇ.ɢ. /ᴘᴅғ_ʟᴏᴄᴋ <ᴘᴀssᴡᴏʀᴅ>.
-➲ /setbanner: ᴛᴏ sᴇᴛ ʏᴏᴜʀ ᴘᴅғ ʙᴀɴɴᴇʀ.
-➲ /viewbanner: ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴘᴅғ ʙᴀɴɴᴇʀ.
-➲ /delbanner: ᴛᴏ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴘᴅғ ʙᴀɴɴᴇʀ.
+➲ </code>/pdfmode</code>: ᴛᴏ sᴇᴇ ᴀʟʟ ᴘᴅғ ʀᴇʟᴀᴛᴇᴅ sᴇᴛᴛɪɴɢs.
+➲ </code>/pdf_replace</code>: ᴛᴏ ʀᴇᴘʟᴀᴄᴇ ᴘᴅғ ᴘᴀɢᴇs ᴡɪᴛʜ ʏᴏᴜʀ ʙᴀɴɴᴇʀ.
+➲ </code>/pdf_extractor</code>: ᴛᴏ ᴇxᴛʀᴀᴄᴛ ғɪʀsᴛ ᴀɴᴅ ʟᴀsᴛ ᴘᴀɢᴇs ᴏғ ᴘᴅғ.
+➲ </code>/pdf_add</code>: ᴛᴏ ᴀᴅᴅ ʏᴏᴜʀ ʙᴀɴɴᴇʀ ɪɴ ᴘᴅғ.
+➲ </code>/pdf_remove</code>: ᴛᴏ ʀᴇᴍᴏᴠᴇ ᴘᴀɢᴇs ғʀᴏᴍ ᴘᴅғ.
+➲ </code>/set_pdf_lock</code>: ᴛᴏ sᴇᴛ ʏᴏᴜʀ ᴘᴅғ ʟᴏᴄk (ᴅᴇғᴀᴜʟᴛ).
+➲ </code>/pdf_lock</code>:ᴛᴏ ʟᴏᴄᴋ ᴘᴅғ ᴡɪᴛʜ ᴘᴀssᴡᴏʀᴅ sᴇᴛ ʙʏ ʏᴏᴜ ᴏʀ ᴀɴʏ ᴘᴀssᴡᴏʀᴅ ᴇ.ɢ. /ᴘᴅғ_ʟᴏᴄᴋ <ᴘᴀssᴡᴏʀᴅ>.
+➲ </code>/setbanner</code>: ᴛᴏ sᴇᴛ ʏᴏᴜʀ ᴘᴅғ ʙᴀɴɴᴇʀ.
+➲ </code>/viewbanner</code>: ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴘᴅғ ʙᴀɴɴᴇʀ.
+➲ </code>/delbanner</code>: ᴛᴏ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴘᴅғ ʙᴀɴɴᴇʀ.
 
 """
     TELEGRAPH_TXT = """<b>ʜᴇʟᴘ: ᴛᴇʟᴇɢʀᴀᴘʜ ᴅᴏ ᴀꜱ ʏᴏᴜ ᴡɪꜱʜ ᴡɪᴛʜ ᴛᴇʟᴇɢʀᴀ.ᴘʜ ᴍᴏᴅᴜʟᴇ! 
   
- ᴜꜱᴀɢᴇ: /telegraph - ꜱᴇɴᴅ ᴍᴇ ᴘɪᴄᴛᴜʀᴇ ᴏʀ ᴠɪᴅᴇᴏ ᴜɴᴅᴇʀ (5ᴍʙ) 
+ ᴜꜱᴀɢᴇ:</code> /telegraph </code>- ꜱᴇɴᴅ ᴍᴇ ᴘɪᴄᴛᴜʀᴇ ᴏʀ ᴠɪᴅᴇᴏ ᴜɴᴅᴇʀ (5ᴍʙ) 
   
  ɴᴏᴛᴇ: 
  ᴛʜɪꜱ ᴄᴏᴍᴍᴀɴᴅ ɪꜱ ᴀᴠᴀɪʟᴀʙʟᴇ ɪɴ ɢᴏᴜᴘꜱ ᴀɴᴅ ᴘᴍꜱ 
@@ -301,9 +301,9 @@ Pʀɪᴄɪɴɢ:
     TOKEN_TXT = """
     ʜᴇʟᴘ: ᴛᴇʟᴇɢʀᴀᴘʜ ᴅᴏ ᴀꜱ ʏᴏᴜ ᴡɪꜱʜ ᴡɪᴛʜ ᴛᴇʟᴇɢʀᴀ.ᴘʜ ᴍᴏᴅᴜʟᴇ! 
 
-➲ /token: ᴄʜᴇᴄᴋ ʜᴏᴡ ᴍᴀɴʏ ᴛᴏᴋᴇɴs ʏᴏᴜ ʜᴀᴠᴇ
-➲ /gentoken: ᴛᴏ generate ad token to get rename tokens
-➲ /refer: refer to get free tokens.
+➲ </code>/token</code>: ᴄʜᴇᴄᴋ ʜᴏᴡ ᴍᴀɴʏ ᴛᴏᴋᴇɴs ʏᴏᴜ ʜᴀᴠᴇ
+➲ </code>/gentoken</code>: ᴛᴏ generate ad token to get rename tokens
+➲ </code>/refer</code>: refer to get free tokens.
   
  ɴᴏᴛᴇ: 
  ᴛʜɪꜱ ᴄᴏᴍᴍᴀɴᴅ ɪꜱ ᴀᴠᴀɪʟᴀʙʟᴇ ɪɴ ɢᴏᴜᴘꜱ ᴀɴᴅ ᴘᴍꜱ 
@@ -313,20 +313,20 @@ Pʀɪᴄɪɴɢ:
 Get information about animes!
 
 USAGE:
-➢ /anime [name] - Get detailed information about a specific anime.
-➢ /findanime - Reply to an anime image to identify the anime from the scene.
-➢ /sauce - Reply to an image to find its source (anime, manga, or artwork).
+➢ </code>/anime</code> [name] - Get detailed information about a specific anime.
+➢ </code>/findanime</code> - Reply to an anime image to identify the anime from the scene.
+➢ </code>/sauce</code> - Reply to an image to find its source (anime, manga, or artwork).
 """
     SORT_TXT = """
-➲ /ssequence: sᴛᴀʀᴛ sᴇǫᴜᴇɴᴄᴇ.
-➲ /ssequence: ᴇɴᴅ sᴇǫᴜᴇɴᴄᴇ.
+➲ </code>/ssequence</code>: sᴛᴀʀᴛ sᴇǫᴜᴇɴᴄᴇ.
+➲ </code>/esequence</code>: ᴇɴᴅ sᴇǫᴜᴇɴᴄᴇ.
 
 """
 
     UPSCALE_TXT = """
 ʜᴇʟᴘ: ᴜᴘꜱᴄᴀʟᴇ ɪᴍᴀɢᴇꜱ ᴜꜱɪɴɢ ᴀɪ ᴘᴏᴡᴇʀ!
 
-➲ /upscale_ffmpeg: ꜱᴇɴᴅ ᴀɴ ɪᴍᴀɢᴇ ᴡɪᴛʜ ᴛʜɪꜱ ᴄᴏᴍᴍᴀɴᴅ ᴛᴏ ᴜᴘꜱᴄᴀʟᴇ ɪᴛ
+➲ </code>/upscale_ffmpeg</code>: ꜱᴇɴᴅ ᴀɴ ɪᴍᴀɢᴇ ᴡɪᴛʜ ᴛʜɪꜱ ᴄᴏᴍᴍᴀɴᴅ ᴛᴏ ᴜᴘꜱᴄᴀʟᴇ ɪᴛ
 
 
 ɴᴏᴛᴇ:
@@ -340,33 +340,33 @@ USAGE:
   
  ʏᴏᴜ ᴄᴀɴ ᴜꜱᴇ ᴛʜɪꜱ ᴍᴏᴅᴜʟᴇ ᴛᴏ ᴄʜᴀɴɢᴇ ꜰᴏɴᴛ ꜱᴛyʟᴇ   
   
- ᴄᴏᴍᴍᴀɴᴅ : /font ʏᴏᴜʀ ᴛᴇxᴛ (ᴏᴩᴛɪᴏɴᴀʟ) 
+ ᴄᴏᴍᴍᴀɴᴅ : </code>/font</code> ʏᴏᴜʀ ᴛᴇxᴛ (ᴏᴩᴛɪᴏɴᴀʟ) 
  ᴇɢ:- /font ʜᴇʟʟᴏ
 
 """
     TOOLS_TXT = """
 📚 ʜᴇʀᴇ ᴀʀᴇ ᴍʏ ᴄᴏᴍᴍᴀɴᴅꜱ ʟɪꜱᴛ ꜰᴏʀ ᴀʟʟ ʙᴏᴛ Users ⇊
 
-➲ /refer: ᴛᴏ ɢᴇᴛ ʏᴏᴜʀ ʀᴇғᴇʀ ʟɪɴᴋ ᴀɴᴅ ᴄʜᴇᴄᴋ ʏᴏᴜʀ ʀᴇғᴇʀ ᴄᴏᴜɴᴛ.
-➲ /renamed: ᴛᴏ ᴠɪᴇᴡ ʀᴇɴᴀᴍᴇᴅ sᴛᴀᴛs.
-➲ /rename_history: ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ʀᴇɴᴀᴍɪɴɢ ʜɪsᴛᴏʀʏ.
-➲ /setmedia: ᴛᴏ sᴇᴛ ᴍᴇᴅɪᴀ ᴛʏᴘᴇ ɪɴ ʏᴏᴜʀ ʙᴏᴛ.
-➲ /token_usage: ᴛᴏ ᴛᴜʀɴ ᴏɴ ᴏғғ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ.
-➲ /set_caption: ᴛᴏ ꜱᴇᴛ ᴀ ᴄᴜꜱᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ.
-➲ /view_caption: ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴄᴀᴘᴛɪᴏɴ.
-➲ /del_caption: ᴛᴏ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴄᴀᴘᴛɪᴏɴ.
-➲ /setthumb: ᴛᴏ sᴇᴛ ᴄᴜꜱᴛᴏᴍ ᴛʜᴜᴍʙɴᴀɪʟ.
-➲ /getthumb: ᴛᴏ ɢᴇᴛ ᴛʜᴜᴍʙɴᴀɪʟ ғʀᴏᴍ ᴏᴛʜᴇʀ ᴠɪᴅᴇᴏs.
-➲ /viewthumb: ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴛʜᴜᴍʙɴᴀɪʟ.
-➲ /delthumb: ᴛᴏ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴛʜᴜᴍʙɴᴀɪʟ.
-➲ /setbanner: ᴛᴏ sᴇᴛ ʏᴏᴜʀ ᴘᴅғ ʙᴀɴɴᴇʀ.
-➲ /viewbanner: ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴘᴅғ ʙᴀɴɴᴇʀ.
-➲ /delbanner: ᴛᴏ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴘᴅғ ʙᴀɴɴᴇʀ.
-➲ /metadata: ᴄᴏᴍᴍᴀɴᴅꜱ ᴛᴏ ᴛᴜʀɴ ᴏɴ ᴏғғ ᴍᴇᴛᴀᴅᴀᴛᴀ.
-➲ /help: ɢᴇᴛ ǫᴜɪᴄᴋ ᴀꜱꜱɪꜱᴛᴀɴᴄᴇ.
+➲ </code>/refer</code>: ᴛᴏ ɢᴇᴛ ʏᴏᴜʀ ʀᴇғᴇʀ ʟɪɴᴋ ᴀɴᴅ ᴄʜᴇᴄᴋ ʏᴏᴜʀ ʀᴇғᴇʀ ᴄᴏᴜɴᴛ.
+➲ </code>/renamed</code>: ᴛᴏ ᴠɪᴇᴡ ʀᴇɴᴀᴍᴇᴅ sᴛᴀᴛs.
+➲ </code>/rename_history</code>: ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ʀᴇɴᴀᴍɪɴɢ ʜɪsᴛᴏʀʏ.
+➲ </code>/setmedia</code>: ᴛᴏ sᴇᴛ ᴍᴇᴅɪᴀ ᴛʏᴘᴇ ɪɴ ʏᴏᴜʀ ʙᴏᴛ.
+➲ </code>/token_usage</code>: ᴛᴏ ᴛᴜʀɴ ᴏɴ ᴏғғ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ.
+➲ </code>/set_caption</code>: ᴛᴏ ꜱᴇᴛ ᴀ ᴄᴜꜱᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ.
+➲ </code>/view_caption</code>: ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴄᴀᴘᴛɪᴏɴ.
+➲ </code>/del_caption</code>: ᴛᴏ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴄᴀᴘᴛɪᴏɴ.
+➲ </code>/setthumb</code>: ᴛᴏ sᴇᴛ ᴄᴜꜱᴛᴏᴍ ᴛʜᴜᴍʙɴᴀɪʟ.
+➲ </code>/getthumb</code>: ᴛᴏ ɢᴇᴛ ᴛʜᴜᴍʙɴᴀɪʟ ғʀᴏᴍ ᴏᴛʜᴇʀ ᴠɪᴅᴇᴏs.
+➲ </code>/viewthumb</code>: ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴛʜᴜᴍʙɴᴀɪʟ.
+➲ </code>/delthumb</code>: ᴛᴏ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴛʜᴜᴍʙɴᴀɪʟ.
+➲ </code>/setbanner</code>: ᴛᴏ sᴇᴛ ʏᴏᴜʀ ᴘᴅғ ʙᴀɴɴᴇʀ.
+➲ </code>/viewbanner</code>: ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴘᴅғ ʙᴀɴɴᴇʀ.
+➲ </code>/delbanner</code>: ᴛᴏ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴘᴅғ ʙᴀɴɴᴇʀ.
+➲ </code>/metadata</code>: ᴄᴏᴍᴍᴀɴᴅꜱ ᴛᴏ ᴛᴜʀɴ ᴏɴ ᴏғғ ᴍᴇᴛᴀᴅᴀᴛᴀ.
+➲ </code>/help</code>: ɢᴇᴛ ǫᴜɪᴄᴋ ᴀꜱꜱɪꜱᴛᴀɴᴄᴇ.
 """
     STICKER_TXT = """ <b> 
 
-›› /stickerid : ᴛᴏ ɢᴇᴛ ꜱᴛɪᴄᴋᴇʀ 
+›› </code>/stickerid</code> : ᴛᴏ ɢᴇᴛ ꜱᴛɪᴄᴋᴇʀ 
                          
 </b>"""
