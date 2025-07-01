@@ -8,8 +8,8 @@ class Config(object):
     API_HASH  = os.environ.get("API_HASH", "65b44989de9accc59c64691b308da0f7")
     BOT_TOKEN = os.environ.get("BOT_TOKEN", "7790118521:AAFA13wK8zI4jSJK-nOMowacyVoHTCKJMFg") 
 
-    DB_NAME = os.environ.get("DB_NAME","erenyeagermikasa84")     
-    DB_URL  = os.environ.get("DB_URL","mongodb+srv://erenyeagermikasa84:pkbOXb3ulzi9cEFd@cluster0.ingt8mt.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+    DB_NAME = os.environ.get("DB_NAME","Cluster0")     
+    DB_URL  = os.environ.get("DB_URL","mongodb+srv://gd3251791:qAFhXxHXPkaNxw9u@cluster0.mr2u1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
     PORT = os.environ.get("PORT", "8080")
  
     BOT_UPTIME  = time.time()
@@ -20,15 +20,15 @@ class Config(object):
     ADMIN       = [int(admin) if id_pattern.search(admin) else admin for admin in os.environ.get('ADMIN', '1047253913').split()]
     FORCE_SUB_CHANNELS = os.environ.get('FORCE_SUB_CHANNELS', ' ').split(', ')
     LOG_CHANNEL = os.environ.get("LOG_CHANNEL", "@emledhurrror")
-    DUMP_CHANNEL = os.environ.get("DUMP_CHANNEL", "-1001333766434")
+    DUMP_CHANNEL = os.environ.get("DUMP_CHANNEL", "-1002308381248")
     DUMP = True
     BOT_CHANNEL_NAME = os.environ.get("BOT_CHANNEL_NAME", "TFIBOTS")
-    BOT_CHANNEL_USERNAME = os.environ.get("BOT_CHANNEL_USERNAME", "Ai_Hoshinoleechbot")
+    BOT_CHANNEL_USERNAME = os.environ.get("BOT_CHANNEL_USERNAME", "Autorenamer2bot")
     SUPPORT_CHANNEL_NAME = os.environ.get("SUPPORT_CHANNEL_NAME", "TFIBOTS_SUPPORT ")
     UPDATE_CHANNEL = os.environ.get("SUPPORT_CHANNEL_USERNAME", "TFIBOTS ")
     SUPPORT_CHANNEL_USERNAME = os.environ.get("SUPPORT_CHANNEL_USERNAME", "TFIBOTS_SUPPORT ")
     SUPPORT_GROUP = os.environ.get("SUPPORT_CHANNEL_USERNAME", "TFIBOTS_SUPPORT ")
-    BOT_USERNAME = os.environ.get("BOT_USERNAME", "Ai_Hoshinoleechbot")
+    BOT_USERNAME = os.environ.get("BOT_USERNAME", "Autorenamer2bot")
     BOT_NAME = os.environ.get("BOT_NAME", "Ai Hoshino")
     OWNER_NAME = os.environ.get("OWNER_NAME", "Raaaaavi")
     OWNER_USERNAME = os.environ.get("OWNER_USERNAME", "Raaaaavi")
