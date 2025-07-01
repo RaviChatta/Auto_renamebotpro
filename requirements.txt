@@ -140,3 +140,8 @@ webcolors
 webencodings
 websocket-client
 yarl
+cloudinary
+PyPDF2
+pdf2image
+utils
+playwright
