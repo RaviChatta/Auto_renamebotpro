@@ -318,6 +318,7 @@ USAGE:
 ➢ </code>/sauce</code> - Reply to an image to find its source (anime, manga, or artwork).
 """
     SORT_TXT = """
+➲ <code>/autorename_on</code> - ᴇɴᴀʙʟᴇ ᴀᴜᴛᴏ ʀᴇɴᴀᴍɪɴɢ  
 ➲ </code>/ssequence</code>: sᴛᴀʀᴛ sᴇǫᴜᴇɴᴄᴇ.
 ➲ </code>/esequence</code>: ᴇɴᴅ sᴇǫᴜᴇɴᴄᴇ.
 
