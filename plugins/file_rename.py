@@ -593,6 +593,7 @@ def detect_quality(file_name):
         "480p": 4,
         "720p": 5, 
         "1080p": 6,
+        
         "1440p": 7,
         "2160p": 8
         }
