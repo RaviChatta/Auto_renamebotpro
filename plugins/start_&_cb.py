@@ -18,8 +18,8 @@ import pytz
 from functools import wraps
 import secrets
 import logging
-from plugins.fonts import FONTS, apply_font
-from plugins.ai import *
+from plugins.extra.fonts import FONTS, apply_font
+#from plugins.ai import *
 # Add this at the top of your file with other imports
 from typing import Dict, Optional
 
@@ -368,11 +368,11 @@ async def start(client, message: Message):
 
     buttons = InlineKeyboardMarkup([
         [   # A R I S E row at the top
-            InlineKeyboardButton(text="ᴀ", callback_data="start"),       # A
-            InlineKeyboardButton(text="ʀ", callback_data="group_info"),  # R
+            InlineKeyboardButton(text="ᴀ", callback_data="help"),       # A
+            InlineKeyboardButton(text="ʀ", callback_data="help"),  # R
             InlineKeyboardButton(text="ɪ", callback_data="about"),       # I
-            InlineKeyboardButton(text="ꜱ", callback_data="main"),        # S
-            InlineKeyboardButton(text="ᴇ", callback_data="shortlink_info")  # E
+            InlineKeyboardButton(text="ꜱ", callback_data="premiumx"),        # S
+            InlineKeyboardButton(text="ᴇ", callback_data="help")  # E
         ],
         [
             InlineKeyboardButton('ᴜᴘᴅᴀᴛᴇs', url= "https://t.me/TFIBOTS"),
