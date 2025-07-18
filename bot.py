@@ -10,8 +10,8 @@ import pyrogram.utils
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
 import time
-from animebot import AnimeBot  # Import the AnimeBot class
-from plugins.compress import start_compressor, compressor 
+#from animebot import AnimeBot  # Import the AnimeBot class
+#from plugins.compress import start_compressor, compressor 
 
 pyrogram.utils.MIN_CHANNEL_ID = -1002258136705
 
@@ -43,7 +43,7 @@ class Bot(Client):
         
         # Start the anime queue processor
         asyncio.create_task(self.anime_bot.adaptive_queue_processor())
-        asyncio.create_task(start_compressor(self))  # Start compressor
+      #  asyncio.create_task(start_compressor(self))  # Start compressor
        
 
       #  app.add_handler(start_compressor)
@@ -84,7 +84,7 @@ class Bot(Client):
         # Cleanup AnimeBot resources
         if self.anime_bot:
             await self.anime_bot.shutdown()
-            await cleanup_compressor()
+         #   await cleanup_compressor()
         await super().stop()
 
 if __name__ == "__main__":
