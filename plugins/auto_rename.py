@@ -103,17 +103,23 @@ async def handle_history_pagination(client, callback_query: CallbackQuery):
 async def auto_rename_command(client, message):
     try:
         user_id = message.from_user.id
-        
+
+        # Extract template from command
         command_parts = message.text.split(maxsplit=1)
-        if len(message.command) < 2 or not command_parts[1].strip():
+        if len(command_parts) < 2 or not command_parts[1].strip():
             await message.reply_text(
-                "**Pʟᴇᴀsᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ʀᴇɴᴀᴍᴇ ᴛᴇᴍᴘʟᴀᴛᴇ**\n\n"
-                "**Fᴏʀᴍᴀᴛ:** `/autorename [Season-Episode] Show Name [Quality] [Audio] @ChannelName`\n"
-                "**Exᴀᴍᴘʟᴇ:** `/autorename [Sseason-episode] World Trigger [quality] [audio] @GenAnimeOfc`\n\n"
-                "**Tʜᴇ ʙᴏᴛ ᴡɪʟʟ ᴜsᴇ ᴛʜɪs ᴛᴇᴍᴘʟᴀᴛᴇ ᴛᴏ ʀᴇɴᴀᴍᴇ ʏᴏᴜʀ ғɪʟᴇs ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ.**"
+                "**⚠️ Pʟᴇᴀsᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ʀᴇɴᴀᴍᴇ ᴛᴇᴍᴘʟᴀᴛᴇ.**\n\n"
+                "**🧾 Fᴏʀᴍᴀᴛ:** `<code>/autorename [S{season}E{episode}] {title} [{resolution}] [{audio}]</code>`\n"
+                "**🎬 Iɴᴘᴜᴛ:** `World Trigger S01E03 [1080p] [Dual].mkv`\n"
+                "**📁 Oᴜᴛᴘᴜᴛ:** `[S01E03] World Trigger [1080p] [Dual]`\n\n"
+                "**📌 Nᴏᴛᴇs:**\n"
+                "- Tʜᴇ ʙᴏᴛ ᴡɪʟʟ ᴜsᴇ ᴛʜɪs ᴛᴇᴍᴘʟᴀᴛᴇ ᴛᴏ ʀᴇɴᴀᴍᴇ ʏᴏᴜʀ ғɪʟᴇs ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ.\n"
+                "- Eɴᴀʙʟᴇ ᴡɪᴛʜ `/autorename_on`  •  Dɪsᴀʙʟᴇ ᴡɪᴛʜ `/autorename_off`\n"
+                "- `{title}` ᴇxᴛʀᴀᴄᴛs ᴛʜᴇ ᴍᴀɪɴ ᴛɪᴛʟᴇ, ʀᴇᴍᴏᴠɪɴɢ sᴇᴀsᴏɴ/ᴇᴘɪsᴏᴅᴇ/ǫᴜᴀʟɪᴛʏ/ᴍᴇᴛᴀᴅᴀᴛᴀ."
             )
             return
 
+        # Save template for user or process further
         format_template = command_parts[1].strip()
 
         await DARKXSIDE78.set_format_template(user_id, format_template)
