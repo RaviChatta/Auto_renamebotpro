@@ -126,6 +126,7 @@ async def pdf_replace_banner(client, message: Message):
         img = Image.open(temp_banner_path).convert("RGB")
         img = img.resize((800, 1131))
         img_pdf_path = temp_banner_path + ".pdf"
+        img.save(img_pdf_path, "PDF")
         img_reader = PdfReader(img_pdf_path)
         img_page = img_reader.pages[0]
         indices = set()
@@ -157,7 +158,7 @@ async def pdf_replace_banner(client, message: Message):
         await processing_msg.delete()
         await message.reply(f"**Fᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴘʟᴀᴄᴇ ᴘᴀɢᴇs﹕** `{e}`")
     finally:
-        for path in [input_path, output_path, temp_banner_path, temp_banner_path + ".pdf"]:
+        for path in [input_path, output_path, temp_banner_path, img_pdf_path]:
             if os.path.exists(path):
                 os.remove(path)
 
@@ -249,7 +250,7 @@ async def pdf_add_banner(client, message: Message):
         await processing_msg.delete()
         await message.reply(f"**Fᴀɪʟᴇᴅ ᴛᴏ ᴀᴅᴅ ʙᴀɴɴᴇʀ ᴘᴀɢᴇ⁽s⁾﹕** `{e}`")
     finally:
-        for path in [input_path, output_path, temp_banner_path, temp_banner_path + ".pdf"]:
+        for path in [input_path, output_path, temp_banner_path, img_pdf_path]:
             if os.path.exists(path):
                 os.remove(path)
 
@@ -258,10 +259,10 @@ async def pdf_add_banner(client, message: Message):
 async def set_pdf_lock_cmd(client, message: Message):
     args = message.text.split(maxsplit=1)
     if len(args) < 2 or not args[1].strip():
-        return await message.reply("** Usᴀɢᴇ﹕** `/set_pdf_lock yourpassword`")
+        return await message.reply("**Usᴀɢᴇ﹕** `/set_pdf_lock yourpassword`")
     password = args[1].strip()
     await DARKXSIDE78.set_pdf_lock_password(message.from_user.id, password)
-    await message.reply("**Dᴇꜰᴀᴜʟᴛ PDF ʟᴏᴄᴋ ᴘᴀssᴡᴏʀᴅ sᴇᴛ﹗ Nᴏᴡ ʏᴏᴜ ᴄᴀɴ ᴜsᴇ `/pdf_lock` ᴡɪᴛʜᴏᴜᴛ sᴘᴇᴄɪꜰʏɪɴɢ ᴀ ᴘᴀssᴡᴏʀᴅ.**")
+    await message.reply("**Dᴇꜰᴀᴜʟᴛ PDF ʟᴏᴄᴋ ᴘᴀssᴡᴏʀᴅ sᴇᴛ﹗ Nᴏᴡ ʏᴏᴜ ᴄᴀɴ ᴜsᴇ `/pdf_lock` ᴡɪᴛʜᴏᴜᴛ sᴘᴇᴄɪ�ʏɪɴɢ ᴀ ᴘᴀssᴡᴏʀᴅ.**")
 
 @Client.on_message(filters.command("pdf_lock") & filters.reply)
 @check_ban_status
@@ -330,7 +331,6 @@ async def pdf_remove_pages(client, message: Message):
                 writer.add_page(page)
         with open(output_path, "wb") as f:
             writer.write(f)
-        # Fetch user thumbnail if set
         thumb = await DARKXSIDE78.get_thumbnail(message.chat.id)
         thumb_path = None
         if thumb:
@@ -369,7 +369,6 @@ async def ffmpeg_upscale_photo(client, message):
             await status.edit("**Uᴘsᴄᴀʟɪɴɢ ꜰᴀɪʟᴇᴅ﹕ FFᴍᴘᴇɢ ɴᴏᴛ ꜰᴏᴜɴᴅ ᴏɴ sᴇʀᴠᴇʀ.**")
             return
 
-        # Get original dimensions
         process = await asyncio.create_subprocess_exec(
             ffmpeg, "-v", "error", "-select_streams", "v:0", "-show_entries",
             "stream=width,height", "-of", "csv=s=x:p=0", "-i", input_path,
@@ -593,10 +592,9 @@ def detect_quality(file_name):
         "480p": 4,
         "720p": 5, 
         "1080p": 6,
-        
         "1440p": 7,
         "2160p": 8
-        }
+    }
     match = re.search(r"(144p|240p|360p|480p|720p|1080p|1440p|2160p)", file_name)
     return quality_order.get(match.group(1), 8) if match else 9
 
@@ -748,8 +746,8 @@ async def global_premium_control(client, message: Message):
         return await message.reply_text(
             f"**➠ Cᴜʀʀᴇɴᴛ Tᴏᴋᴇɴ Usᴀɢᴇ: {status}{expiry}**\n\n"
             "**Usᴀɢᴇ:**\n"
-            "`/token_usage on [days|12m|1y]`  — Eɴᴀʙʟᴇ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ\n"
-            "`/token_usage off [days|12m|1y]` — Dɪsᴀʙʟᴇ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ"
+            "`/token_usage on [days|12m|1y`  — Eɴᴀʙʟᴇ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ\n"
+            "`/token_usage off [days|12m|1y` — Dɪsᴀʙʟᴇ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ"
         )
 
     action = args[0].lower()
@@ -785,7 +783,7 @@ async def check_premium_mode():
     if not settings:
         return
 
-    PREMIUM_MODE        = settings.get("status", True)
+    PREMIUM_MODE = settings.get("status", True)
     PREMIUM_MODE_EXPIRY = settings.get("expiry", None)
 
     if PREMIUM_MODE_EXPIRY and datetime.now() > PREMIUM_MODE_EXPIRY:
@@ -794,7 +792,6 @@ async def check_premium_mode():
             {"_id": "premium_mode"},
             {"$set": {"status": PREMIUM_MODE}}
         )
-
 
 SEASON_EPISODE_PATTERNS = [
     (re.compile(r'\[S(\d{1,2})[\s\-]+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),   # [S01-E06]
@@ -896,6 +893,7 @@ def extract_title(source_text):
     title = ' '.join(word.capitalize() for word in title.split())
     
     return title if title else "Unknown"
+
 async def detect_audio_info(file_path):
     ffprobe = shutil.which('ffprobe')
     if not ffprobe:
@@ -1057,28 +1055,55 @@ async def add_metadata(input_path, output_path, user_id):
         'commentz': await DARKXSIDE78.get_commentz(user_id)
     }
 
-    cmd = [
-        ffmpeg,
-        '-hide_banner',
-        '-i', input_path,
-        '-map', '0',
-        '-c', 'copy',
-        '-metadata', f'title={metadata["title"]}',
-        '-metadata:s:v', f'title={metadata["video"]}',
-        '-metadata:s:s', f'title={metadata["subtitle"]}',
-        '-metadata:s:a', f'title={metadata["audio"]}',
-        '-metadata', f'artist={metadata["artist"]}',
-        '-metadata', f'author={metadata["author"]}',
-        '-metadata', f'encoded_by={metadata["encoded_by"]}',
-        '-metadata', f'comment={metadata["commentz"]}',
-        '-metadata', f'custom_tag={metadata["custom_tag"]}',
-        '-loglevel', 'error',
-        '-y'
-    ]
-
-    cmd += ['-f', 'matroska', output_path]
-
+    # First try with all metadata
     try:
+        cmd = [
+            ffmpeg,
+            '-hide_banner',
+            '-i', input_path,
+            '-map', '0',
+            '-c', 'copy',
+            '-metadata', f'title={metadata["title"]}',
+            '-metadata:s:v', f'title={metadata["video"]}',
+            '-metadata:s:s', f'title={metadata["subtitle"]}',
+            '-metadata:s:a', f'title={metadata["audio"]}',
+            '-metadata', f'artist={metadata["artist"]}',
+            '-metadata', f'author={metadata["author"]}',
+            '-metadata', f'encoded_by={metadata["encoded_by"]}',
+            '-metadata', f'comment={metadata["commentz"]}',
+            '-metadata', f'custom_tag={metadata["custom_tag"]}',
+            '-loglevel', 'error',
+            '-y',
+            output_path
+        ]
+
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        _, stderr = await process.communicate()
+
+        if process.returncode == 0:
+            return output_path
+
+    except Exception as e:
+        logger.warning(f"Full metadata addition failed, trying with basic metadata: {e}")
+
+    # Fallback to just title if full metadata fails
+    try:
+        cmd = [
+            ffmpeg,
+            '-hide_banner',
+            '-i', input_path,
+            '-map', '0',
+            '-c', 'copy',
+            '-metadata', f'title={metadata["title"]}',
+            '-loglevel', 'error',
+            '-y',
+            output_path
+        ]
+
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
@@ -1302,7 +1327,7 @@ async def auto_rename_files(client, message: Message):
                 await aiofiles.os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
                 await aiofiles.os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-                await msg.edit("**Dᴏᴡɴʟᴏᴀᴅɪɴɢ...**")
+                msg = await message.reply_text("**Dᴏᴡɴʟᴏᴀᴅɪɴɢ...**")
                 try:
                     file_path = await client.download_media(
                         message,
@@ -1395,7 +1420,6 @@ async def auto_rename_files(client, message: Message):
                         raise
                 else:
                     file_path = download_path
-
 
                 if (media_type in ["video", "audio"] or 
                     (media_type == "document" and file_ext != ".pdf")):
@@ -1517,8 +1541,8 @@ async def auto_rename_files(client, message: Message):
                         ".xml", ".html", ".json", ".md", ".log", ".ini", ".bat", ".sh"
                     ):
                         await client.send_document(
-                        document=file_path,
-                        **upload_params
+                            document=file_path,
+                            **upload_params
                         )
                     elif media_type == "video":
                         if media_preference == "video":
@@ -1601,30 +1625,31 @@ async def auto_rename_files(client, message: Message):
                             logger.error(f"Error sending to dump channel: {e}")
 
                     await msg.delete()
-                  except Exception as e:
-                      await msg.edit(f"Uᴘʟᴏᴀᴅ ғᴀɪʟᴇᴅ: {e}")
-                      raise
+                except Exception as e:
+                    await msg.edit(f"Uᴘʟᴏᴀᴅ ғᴀɪʟᴇᴅ: {e}")
+                    raise
   
-                 except Exception as e:
-                      logger.error(f"Processing error: {e}")
-                      await message.reply_text(f"Eʀʀᴏʀ: {str(e)}")
-                  finally:
-                      await cleanup_files(download_path, metadata_path, thumb_path, output_path)
-                      renaming_operations.pop(file_id, None)
+            except Exception as e:
+                logger.error(f"Processing error: {e}")
+                await message.reply_text(f"Eʀʀᴏʀ: {str(e)}")
+            finally:
+                await cleanup_files(download_path, metadata_path, thumb_path, output_path)
+                renaming_operations.pop(file_id, None)
       
-              except asyncio.CancelledError:
-                  logger.info(f"Task for file {file_id} was cancelled")
-                  if file_path or download_path or metadata_path or thumb_path or output_path:
-                      await cleanup_files(download_path, metadata_path, thumb_path, output_path)
-                  renaming_operations.pop(file_id, None)
-                  raise
-      
-          status = await task_queue.get_queue_status(user_id)
-          msg = await message.reply_text(
-              f"**Yᴏᴜʀ ꜰɪʟᴇ ʜᴀs ʙᴇᴇɴ ᴀᴅᴅᴇᴅ ᴛᴏ qᴜᴇᴜᴇ {status['processing']}. Pʟᴇᴀsᴇ Wᴀɪᴛ.......**"
-          )
-      
-          await task_queue.add_task(user_id, file_id, message, process_file())
+        except asyncio.CancelledError:
+            logger.info(f"Task for file {file_id} was cancelled")
+            if file_path or download_path or metadata_path or thumb_path or output_path:
+                await cleanup_files(download_path, metadata_path, thumb_path, output_path)
+            renaming_operations.pop(file_id, None)
+            raise
+
+    status = await task_queue.get_queue_status(user_id)
+    msg = await message.reply_text(
+        f"**Yᴏᴜʀ ꜰɪʟᴇ ʜᴀs ʙᴇᴇɴ ᴀᴅᴅᴇᴅ ᴛᴏ qᴜᴇᴜᴇ {status['processing']}. Pʟᴇᴀsᴇ Wᴀɪᴛ.......**"
+    )
+    
+    await task_queue.add_task(user_id, file_id, message, process_file())
+
 @Client.on_message(filters.command("renamed") & (filters.group | filters.private))
 @check_ban_status
 async def renamed_stats(client, message: Message):
@@ -1811,7 +1836,7 @@ async def renamed_filter_callback(client, callback_query):
     except Exception as e:
         await callback_query.answer(f"Error: {str(e)}", show_alert=True)
         logger.error(f"Callback error: {e}", exc_info=True)
- # Enhanced bot_info command
+
 @Client.on_message(filters.command("info") & (filters.group | filters.private))
 @check_ban_status
 async def bot_info(client: Client, message: Message):
@@ -1883,6 +1908,7 @@ async def bot_info(client: Client, message: Message):
     except Exception as e:
         logger.error(f"Info command error: {str(e)}", exc_info=True)
         await message.reply_text(f"⚠️ Error generating stats: {str(e)}")
+
 @Client.on_message(filters.command("set_pdf_banner_place"))
 @check_ban_status
 async def set_pdf_banner_place_cmd(client, message: Message):
@@ -1998,19 +2024,6 @@ async def pdf_banner_place_choose_cb(client, callback_query):
     await pdf_mode_settings(client, callback_query.message, edit=True, user_id=owner_id)
     await callback_query.answer(f"PDF ʙᴀɴɴᴇʀ ᴘʟᴀᴄᴇᴍᴇɴᴛ sᴇᴛ ᴛᴏ {placement}!", show_alert=True)
 
-@Client.on_message(filters.command("set_pdf_banner_place"))
-@check_ban_status
-async def set_pdf_banner_place_cmd(client, message: Message):
-    args = message.text.split(maxsplit=1)
-    if len(args) < 2 or args[1].strip().lower() not in ("first", "last", "both"):
-        return await message.reply(
-            "**Usᴀɢᴇ:** `/set_pdf_banner_place first|last|both`\n"
-            "**Sᴇᴛ ᴡʜᴇʀᴇ ʏᴏᴜʀ PDF ʙᴀɴɴᴇʀ ᴡɪʟʟ ʙᴇ ᴀᴅᴅᴇᴅ ʙʏ ᴅᴇғᴀᴜʟᴛ.**"
-        )
-    placement = args[1].strip().lower()
-    await DARKXSIDE78.set_pdf_banner_placement(message.from_user.id, placement)
-    await message.reply(f"**PDF ʙᴀɴɴᴇʀ ᴘʟᴀᴄᴇᴍᴇɴᴛ sᴇᴛ ᴛᴏ:** `{placement}`")
-
 @Client.on_callback_query(filters.regex(r"^toggle_pdf_banner:(0|1)$"))
 async def toggle_pdf_banner_cb(client, callback_query):
     mode = bool(int(callback_query.matches[0].group(1)))
@@ -2034,4 +2047,3 @@ async def set_pdf_banner_cb(client, callback_query):
 @Client.on_callback_query(filters.regex(r"^set_pdf_lock_pw$"))
 async def set_pdf_lock_pw_cb(client, callback_query):
     await callback_query.answer("Sᴇɴᴅ /set_pdf_lock <password> ᴛᴏ sᴇᴛ ʏᴏᴜʀ PDF ʟᴏᴄᴋ ᴘᴀssᴡᴏʀᴅ.", show_alert=True)
-
