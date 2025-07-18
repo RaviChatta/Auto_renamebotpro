@@ -856,7 +856,45 @@ def extract_quality(filename):
     
     return " ".join(quality_parts) if quality_parts else "Unknown"
 
-
+def extract_title(source_text):
+    """Extract the show title from the file name or caption, removing metadata."""
+    if not source_text:
+        return "Unknown"
+    
+    # Clean the source text by removing unwanted patterns
+    text = source_text.lower()
+    
+    # Remove season and episode patterns
+    for pattern, _ in SEASON_EPISODE_PATTERNS:
+        text = pattern.sub("", text)
+    
+    # Remove quality patterns
+    for pattern, _ in QUALITY_PATTERNS:
+        text = pattern.sub("", text)
+    
+    # Remove common metadata patterns
+    metadata_patterns = [
+        r'\[.*?\]',  # Remove anything in brackets
+        r'\(.*?\)',  # Remove anything in parentheses
+        r'\b\d{4}\b',  # Remove years (e.g., 2023)
+        r'\b(sub|dub|dual|tri|multi|eng|jpn|japanese|english)\b',  # Remove audio/subtitle tags
+        r'\b(h264|h265|x264|x265|hevc|avc|aac|ac3|dts|flac)\b',  # Remove codec info
+        r'\b(web-dl|webrip|bluray|bdrip|brrip|dvdrip|hdrip|hdtv)\b',  # Remove source tags
+        r'\b(uncensored|uncut|extended|remastered|repack)\b',  # Remove edition tags
+        r'\b(v\d+|version\d+)\b',  # Remove version tags
+        r'\s+',  # Replace multiple spaces with single space
+    ]
+    
+    for pattern in metadata_patterns:
+        text = re.sub(pattern, ' ', text, flags=re.IGNORECASE)
+    
+    # Clean up the title
+    title = ' '.join(text.split()).strip()
+    
+    # Capitalize each word for proper title formatting
+    title = ' '.join(word.capitalize() for word in title.split())
+    
+    return title if title else "Unknown"
 async def detect_audio_info(file_path):
     ffprobe = shutil.which('ffprobe')
     if not ffprobe:
@@ -1172,23 +1210,13 @@ async def auto_rename_files(client, message: Message):
         file_ext = None
     else:
         return await message.reply_text("**Uɴsᴜᴘᴘᴏʀᴛᴇᴅ ғɪʟᴇ ᴛʏᴘᴇ**")
-        
-    if user_id in active_sequences:
-        if message.document:
-            file_id = message.document.file_id
-            file_name = message.document.file_name
-        elif message.video:
-            file_id = message.video.file_id
-            file_name = f"{message.video.file_name}.mp4"
-        elif message.audio:
-            file_id = message.audio.file_id
-            file_name = f"{message.audio.file_name}.mp3"
 
+    if user_id in active_sequences:
         file_info = {"file_id": file_id, "file_name": file_name if file_name else "Unknown"}
         active_sequences[user_id].append(file_info)
         await message.reply_text("Fɪʟᴇ ʀᴇᴄᴇɪᴠᴇᴅ ɪɴ sᴇǫᴜᴇɴᴄᴇ...\nEɴᴅ Sᴇǫᴜᴇɴᴄᴇ ʙʏ ᴜsɪɴɢ /esequence")
         return
-        
+
     async def process_file():
         nonlocal file_id, file_name, media_type, file_ext
         file_path = None
@@ -1236,11 +1264,12 @@ async def auto_rename_files(client, message: Message):
                 source_text = message.caption
             else:
                 source_text = file_name
-            
+
             season, episode = extract_season_episode(source_text)
             chapter = extract_chapter(source_text)
             volume = extract_volume(source_text)
             quality = extract_quality(source_text)
+            title = extract_title(source_text)  # Extract title
 
             if not format_template:
                 return await message.reply_text("**Aᴜᴛᴏ ʀᴇɴᴀᴍᴇ ғᴏʀᴍᴀᴛ ɴᴏᴛ sᴇᴛ\nPʟᴇᴀsᴇ sᴇᴛ ᴀ ʀᴇɴᴀᴍᴇ ғᴏʀᴍᴀᴛ ᴜsɪɴɢ /autorename**")
@@ -1251,10 +1280,10 @@ async def auto_rename_files(client, message: Message):
                     return
 
             renaming_operations[file_id] = datetime.now()
-            
+
             try:
                 audio_label = ""
-                
+
                 if media_type == "video" and media_preference == "document":
                     ext = ".mkv"
                 elif media_type == "document" and media_preference == "video":
@@ -1263,11 +1292,11 @@ async def auto_rename_files(client, message: Message):
                     ext = ".pdf"
                 else:
                     ext = os.path.splitext(file_name)[1] or ('.mp4' if media_type == 'video' else '.mp3')
-                
+
                 download_path = f"downloads/{file_name}"
                 metadata_path = f"metadata/{file_name}"
                 output_path = f"processed/{os.path.splitext(file_name)[0]}{ext}"
-                
+
                 await aiofiles.os.makedirs(os.path.dirname(download_path), exist_ok=True)
                 await aiofiles.os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
                 await aiofiles.os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -1283,7 +1312,7 @@ async def auto_rename_files(client, message: Message):
                 except Exception as e:
                     await msg.edit(f"Dᴏᴡɴʟᴏᴀᴅ ғᴀɪʟᴇᴅ: {e}")
                     raise
-                
+
                 await asyncio.sleep(1)
                 await msg.edit("**Dᴏᴡɴʟᴏᴀᴅɪɴɢ Cᴏᴍᴘʟᴇᴛᴇ**")
                 audio_info = await detect_audio_info(file_path)
@@ -1333,8 +1362,14 @@ async def auto_rename_files(client, message: Message):
                     'resolution': actual_resolution,
                     'Resolution': actual_resolution,
                     'RESOLUTION': actual_resolution,
+                    '{title}': title,  # Add title placeholder
+                    '{Title}': title,
+                    '{TITLE}': title,
+                    'title': title,
+                    'Title': title,
+                    'TITLE': title,
                 }
-                
+
                 for ph, val in replacements.items():
                     format_template = format_template.replace(ph, val)
 
@@ -1569,26 +1604,26 @@ async def auto_rename_files(client, message: Message):
                     await msg.edit(f"Uᴘʟᴏᴀᴅ ғᴀɪʟᴇᴅ: {e}")
                     raise
 
-            except Exception as e:
-                logger.error(f"Processing error: {e}")
-                await message.reply_text(f"Eʀʀᴏʀ: {str(e)}")
-            finally:
-                await cleanup_files(download_path, metadata_path, thumb_path, output_path)
-                renaming_operations.pop(file_id, None)
-                
-        except asyncio.CancelledError:
-            logger.info(f"Task for file {file_id} was cancelled")
-            if file_path or download_path or metadata_path or thumb_path or output_path:
-                await cleanup_files(download_path, metadata_path, thumb_path, output_path)
-            renaming_operations.pop(file_id, None)
-            raise
-    
-    status = await task_queue.get_queue_status(user_id)
-    msg = await message.reply_text(
-        f"**Yᴏᴜʀ ꜰɪʟᴇ ʜᴀs ʙᴇᴇɴ ᴀᴅᴅᴇᴅ ᴛᴏ qᴜᴇᴜᴇ {status['processing']}. Pʟᴇᴀsᴇ Wᴀɪᴛ.......**"
-    )
-    
-    await task_queue.add_task(user_id, file_id, message, process_file())
+             except Exception as e:
+                  logger.error(f"Processing error: {e}")
+                  await message.reply_text(f"Eʀʀᴏʀ: {str(e)}")
+              finally:
+                  await cleanup_files(download_path, metadata_path, thumb_path, output_path)
+                  renaming_operations.pop(file_id, None)
+  
+          except asyncio.CancelledError:
+              logger.info(f"Task for file {file_id} was cancelled")
+              if file_path or download_path or metadata_path or thumb_path or output_path:
+                  await cleanup_files(download_path, metadata_path, thumb_path, output_path)
+              renaming_operations.pop(file_id, None)
+              raise
+  
+      status = await task_queue.get_queue_status(user_id)
+      msg = await message.reply_text(
+          f"**Yᴏᴜʀ ꜰɪʟᴇ ʜᴀs ʙᴇᴇɴ ᴀᴅᴅᴇᴅ ᴛᴏ qᴜᴇᴜᴇ {status['processing']}. Pʟᴇᴀsᴇ Wᴀɪᴛ.......**"
+      )
+  
+      await task_queue.add_task(user_id, file_id, message, process_file())
             
 @Client.on_message(filters.command("renamed") & (filters.group | filters.private))
 @check_ban_status
