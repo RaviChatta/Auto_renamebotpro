@@ -1812,10 +1812,10 @@ async def renamed_filter_callback(client, callback_query):
     except Exception as e:
         await callback_query.answer(f"Error: {str(e)}", show_alert=True)
         logger.error(f"Callback error: {e}", exc_info=True)
-        
+ # Enhanced bot_info command
 @Client.on_message(filters.command("info") & (filters.group | filters.private))
 @check_ban_status
-async def bot_info(client, message: Message):
+async def bot_info(client: Client, message: Message):
     try:
         # Get user statistics
         total_users = await DARKXSIDE78.col.count_documents({})
@@ -1831,9 +1831,7 @@ async def bot_info(client, message: Message):
                 "total_size": {"$sum": "$total_renamed_size"}
             }}
         ]).to_list(1)
-        
-        if not rename_stats:
-            rename_stats = [{"total_renames": 0, "total_size": 0}]
+        rename_stats = rename_stats[0] if rename_stats else {"total_renames": 0, "total_size": 0}
 
         # System performance metrics
         cpu = psutil.cpu_percent()
@@ -1844,33 +1842,44 @@ async def bot_info(client, message: Message):
         system_uptime = datetime.now() - datetime.fromtimestamp(psutil.boot_time())
         bot_uptime = datetime.now() - datetime.fromtimestamp(psutil.Process().create_time())
 
-        # Format the response message
-        response = f"""
-<b>🤖 Bot Performance Information</b>
+        # Queue statistics
+        total_queued = sum(len(q) for q in task_queue.queues.values())
+        total_processing = sum(len(p) for p in task_queue.processing.values())
 
-📊 <u>User Statistics</u>
-├ Total Users: <code>{total_users:,}</code>
-└ Active (30d): <code>{active_users:,}</code>
+        # Premium mode status
+        premium_status = "ON" if PREMIUM_MODE else "OFF"
+        premium_expiry = f" (expires {PREMIUM_MODE_EXPIRY:%Y-%m-%d %H:%M})" if PREMIUM_MODE_EXPIRY else ""
 
-🔄 <u>Rename Statistics</u>
-├ Total Files Renamed: <code>{rename_stats[0]['total_renames']:,}</code>
-└ Total Storage Processed: <code>{humanbytes(rename_stats[0]['total_size'])}</code>
+        # Format response
+        response = (
+            f"**🤖 Bot Performance Information**\n\n"
+            f"**📊 User Statistics**\n"
+            f"├ Total Users: <code>{total_users:,}</code>\n"
+            f"└ Active (30d): <code>{active_users:,}</code>\n\n"
+            f"**🔄 Rename Statistics**\n"
+            f"├ Total Files Renamed: <code>{rename_stats['total_renames']:,}</code>\n"
+            f"└ Total Storage Processed: <code>{humanbytes(rename_stats['total_size'])}</code>\n\n"
+            f"**📋 Queue Statistics**\n"
+            f"├ Queued Files: <code>{total_queued}</code>\n"
+            f"└ Processing Files: <code>{total_processing}</code>\n\n"
+            f"**🔐 Premium Mode**\n"
+            f"└ Status: <code>{premium_status}{premium_expiry}</code>\n\n"
+            f"**⚙️ System Resources**\n"
+            f"├ CPU Usage: <code>{cpu:.1f}%</code>\n"
+            f"├ RAM Usage: <code>{ram:.1f}%</code>\n"
+            f"└ Disk Usage: <code>{disk:.1f}%</code>\n\n"
+            f"**⏱️ Uptime**\n"
+            f"├ System: <code>{system_uptime.days} days, {system_uptime.seconds // 3600} hours</code>\n"
+            f"└ Bot: <code>{bot_uptime.days} days, {bot_uptime.seconds // 3600} hours</code>\n\n"
+            f"**Bot ID:** <code>@{Config.BOT_USERNAME}</code>"
+        )
 
-⚙️ <u>System Resources</u>
-├ CPU Usage: <code>{cpu:.1f}%</code>
-├ RAM Usage: <code>{ram:.1f}%</code>
-└ Disk Usage: <code>{disk:.1f}%</code>
-
-⏱️ <u>Uptime</u>
-├ System: <code>{system_uptime.days} days</code>
-└ Bot: <code>{bot_uptime.days} days</code>
-
-<code>Bot ID: @{Config.BOT_USERNAME}</code>
-"""
-        # Send and auto-delete the message
+        # Send message with configurable auto-deletion
         msg = await message.reply_text(response, disable_web_page_preview=True)
-        await asyncio.sleep(30)  # Show for 30 seconds
-        await msg.delete()
+        delete_timer = getattr(Config, 'INFO_DELETE_TIMER', 30)
+        if delete_timer > 0:
+            await asyncio.sleep(delete_timer)
+            await msg.delete()
 
     except Exception as e:
         logger.error(f"Info command error: {str(e)}", exc_info=True)
