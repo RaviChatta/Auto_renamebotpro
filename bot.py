@@ -28,7 +28,7 @@ class Bot(Client):
         )
         self.start_time = time.time()
         self.anime_bot = None  # Will be initialized in start()
-        self.compressor = compressor  # Store compressor instance
+      #  self.compressor = compressor  # Store compressor instance
 
     async def start(self):
         await super().start()
