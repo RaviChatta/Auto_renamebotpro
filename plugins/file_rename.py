@@ -1601,31 +1601,30 @@ async def auto_rename_files(client, message: Message):
                             logger.error(f"Error sending to dump channel: {e}")
 
                     await msg.delete()
-                except Exception as e:
-                    await msg.edit(f"Uᴘʟᴏᴀᴅ ғᴀɪʟᴇᴅ: {e}")
-                    raise
-
-             except Exception as e:
-                  logger.error(f"Processing error: {e}")
-                  await message.reply_text(f"Eʀʀᴏʀ: {str(e)}")
-              finally:
-                  await cleanup_files(download_path, metadata_path, thumb_path, output_path)
+                  except Exception as e:
+                      await msg.edit(f"Uᴘʟᴏᴀᴅ ғᴀɪʟᴇᴅ: {e}")
+                      raise
+  
+                 except Exception as e:
+                      logger.error(f"Processing error: {e}")
+                      await message.reply_text(f"Eʀʀᴏʀ: {str(e)}")
+                  finally:
+                      await cleanup_files(download_path, metadata_path, thumb_path, output_path)
+                      renaming_operations.pop(file_id, None)
+      
+              except asyncio.CancelledError:
+                  logger.info(f"Task for file {file_id} was cancelled")
+                  if file_path or download_path or metadata_path or thumb_path or output_path:
+                      await cleanup_files(download_path, metadata_path, thumb_path, output_path)
                   renaming_operations.pop(file_id, None)
-  
-          except asyncio.CancelledError:
-              logger.info(f"Task for file {file_id} was cancelled")
-              if file_path or download_path or metadata_path or thumb_path or output_path:
-                  await cleanup_files(download_path, metadata_path, thumb_path, output_path)
-              renaming_operations.pop(file_id, None)
-              raise
-  
-      status = await task_queue.get_queue_status(user_id)
-      msg = await message.reply_text(
-          f"**Yᴏᴜʀ ꜰɪʟᴇ ʜᴀs ʙᴇᴇɴ ᴀᴅᴅᴇᴅ ᴛᴏ qᴜᴇᴜᴇ {status['processing']}. Pʟᴇᴀsᴇ Wᴀɪᴛ.......**"
-      )
-  
-      await task_queue.add_task(user_id, file_id, message, process_file())
-            
+                  raise
+      
+          status = await task_queue.get_queue_status(user_id)
+          msg = await message.reply_text(
+              f"**Yᴏᴜʀ ꜰɪʟᴇ ʜᴀs ʙᴇᴇɴ ᴀᴅᴅᴇᴅ ᴛᴏ qᴜᴇᴜᴇ {status['processing']}. Pʟᴇᴀsᴇ Wᴀɪᴛ.......**"
+          )
+      
+          await task_queue.add_task(user_id, file_id, message, process_file())
 @Client.on_message(filters.command("renamed") & (filters.group | filters.private))
 @check_ban_status
 async def renamed_stats(client, message: Message):
