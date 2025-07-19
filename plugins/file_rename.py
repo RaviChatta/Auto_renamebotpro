@@ -793,6 +793,7 @@ async def check_premium_mode():
             {"$set": {"status": PREMIUM_MODE}}
         )
 
+
 SEASON_EPISODE_PATTERNS = [
     (re.compile(r'\[S(\d{1,2})[\s\-]+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),  # [S01-E06]
     (re.compile(r'\[S(\d{1,2})[\s\-]+(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),  # [S01-06]
@@ -810,14 +811,19 @@ SEASON_EPISODE_PATTERNS = [
 ]
 
 QUALITY_PATTERNS = [
+    (re.compile(r'\b(HDRip|HDTV|WEB-DL|WEBRip|BluRay|BDRip|BRRip|DVDRip|HDR)\b', re.IGNORECASE), lambda m: m.group(1)),  # Source-based tags
     (re.compile(r'\[(\d{3,4}p)\](?:\s*\[\1\])*', re.IGNORECASE), lambda m: m.group(1)),  # [720p]
     (re.compile(r'\b(\d{3,4})p\b', re.IGNORECASE), lambda m: f"{m.group(1)}p"),  # 720p
     (re.compile(r'\b(4k|2160p|4k_SDR)\b', re.IGNORECASE), lambda m: "2160p"),  # 4K, 2160p, 4K_SDR
     (re.compile(r'\b(2k|1440p)\b', re.IGNORECASE), lambda m: "1440p"),  # 2K, 1440p
     (re.compile(r'\b(\d{3,4}[pi])\b', re.IGNORECASE), lambda m: m.group(1)),  # 1080i
-    (re.compile(r'\b(HDRip|HDTV|WEB-DL|WEBRip|BluRay|BDRip|BRRip|DVDRip|HDR)\b', re.IGNORECASE), lambda m: m.group(1)),  # HDRip, HDTV, etc.
     (re.compile(r'\b(4kX264|4kx265)\b', re.IGNORECASE), lambda m: "2160p"),  # 4kX264
     (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1)),  # [1080p]
+    (re.compile(r'\b(240p|360p|480p|576p)\b', re.IGNORECASE), lambda m: m.group(1)),  # Low resolutions
+]
+
+CODEC_PATTERNS = [
+    (re.compile(r'\b(x264|x265|HEVC|H264|H265|AVC)\b', re.IGNORECASE), lambda m: m.group(1).lower().replace('h264', 'x264').replace('h265', 'HEVC'))
 ]
 
 def extract_season_episode(filename):
@@ -840,9 +846,9 @@ def extract_season_episode(filename):
     return None, None
 
 def extract_quality(filename):
-    """Extract video quality from filename."""
+    """Extract video quality from filename, prioritizing source-based tags."""
     if not filename:
-        return "Unknown"
+        return "1080p"
     
     for pattern, extractor in QUALITY_PATTERNS:
         match = pattern.search(filename)
@@ -852,7 +858,67 @@ def extract_quality(filename):
             return quality
     
     logger.warning(f"No quality pattern matched for {filename}")
-    return "Unknown"
+    return "1080p"  # Default for movies
+
+def extract_codec(filename, file_path):
+    """Extract codec from filename or ffprobe."""
+    if not filename and not file_path:
+        return None
+    
+    # Try filename first
+    for pattern, extractor in CODEC_PATTERNS:
+        match = pattern.search(filename)
+        if match:
+            codec = extractor(match)
+            logger.info(f"Extracted codec: {codec} from {filename}")
+            return codec
+    
+    # Fallback to ffprobe
+    ffprobe = shutil.which('ffprobe')
+    if not ffprobe:
+        logger.warning("ffprobe not found, skipping codec detection")
+        return None
+
+    cmd = [
+        ffprobe,
+        '-v', 'quiet',
+        '-print_format', 'json',
+        '-show_streams',
+        '-select_streams', 'v',
+        file_path
+    ]
+
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate()
+        info = json.loads(stdout)
+        streams = info.get('streams', [])
+        if not streams:
+            return None
+        video_stream = streams[0]
+        codec = video_stream.get('codec_name', '').lower()
+        codec = 'HEVC' if codec == 'hevc' else 'x264' if codec == 'h264' else codec
+        if codec in {'x264', 'HEVC'}:
+            logger.info(f"Extracted codec: {codec} from ffprobe")
+            return codec
+        return None
+    except Exception as e:
+        logger.error(f"Codec detection error: {e}")
+        return None
+
+def extract_year(filename):
+    """Extract year from filename."""
+    match = re.search(r'\b(\d{4})\b(?!\w)', filename)
+    if match:
+        year = match.group(1)
+        logger.info(f"Extracted year: {year} from {filename}")
+        return year
+    logger.debug(f"No year found in {filename}")
+    return None
 
 async def detect_video_resolution(file_path):
     """Detect actual video resolution using ffprobe."""
@@ -914,7 +980,7 @@ async def detect_audio_info(file_path):
     ffprobe = shutil.which('ffprobe')
     if not ffprobe:
         logger.warning("ffprobe not found, skipping audio detection")
-        return 0, 0, 0, 0, 0
+        return 0, 0, [], []
 
     cmd = [
         ffprobe,
@@ -937,33 +1003,83 @@ async def detect_audio_info(file_path):
         audio_streams = [s for s in streams if s.get('codec_type') == 'audio']
         sub_streams = [s for s in streams if s.get('codec_type') == 'subtitle']
 
-        japanese_audio = sum(1 for audio in audio_streams if audio.get('tags', {}).get('language', '').lower() in {'ja', 'jpn', 'japanese'})
-        english_audio = sum(1 for audio in audio_streams if audio.get('tags', {}).get('language', '').lower() in {'en', 'eng', 'english'})
+        audio_languages = []
+        for audio in audio_streams:
+            lang = audio.get('tags', {}).get('language', '').lower()
+            if lang in {'ja', 'jpn', 'japanese'}:
+                audio_languages.append('Jpn')
+            elif lang in {'en', 'eng', 'english'}:
+                audio_languages.append('Eng')
+            elif lang in {'ta', 'tam', 'tamil'}:
+                audio_languages.append('Tam')
+            elif lang in {'te', 'tel', 'telugu'}:
+                audio_languages.append('Tel')
+            elif lang in {'hi', 'hin', 'hindi'}:
+                audio_languages.append('Hin')
+            elif lang in {'ml', 'mal', 'malayalam'}:
+                audio_languages.append('Mal')
+            elif lang in {'kn', 'kan', 'kannada'}:
+                audio_languages.append('Kan')
+            else:
+                audio_languages.append('Unknown')
+
         english_subs = sum(1 for sub in sub_streams if sub.get('tags', {}).get('language', '').lower() in {'en', 'eng', 'english'})
 
-        return len(audio_streams), len(sub_streams), japanese_audio, english_audio, english_subs
+        return len(audio_streams), len(sub_streams), audio_languages, english_subs
     except Exception as e:
         logger.error(f"Audio detection error: {e}")
-        return 0, 0, 0, 0, 0
+        return 0, 0, [], 0
 
-def get_audio_label(audio_info):
-    """Generate audio label based on audio and subtitle info."""
-    audio_count, sub_count, jp_audio, en_audio, en_subs = audio_info
-    if audio_count == 1:
-        if jp_audio >= 1 and en_subs >= 1:
-            return "Sub"
-        if en_audio >= 1:
-            return "Dub"
-    if audio_count == 2:
-        return "Dual"
-    elif audio_count == 3:
-        return "Tri"
-    elif audio_count >= 4:
+def get_audio_label(audio_info, filename):
+    """Generate audio label based on audio and subtitle info or filename."""
+    audio_count, sub_count, audio_languages, english_subs = audio_info
+
+    # Check filename for explicit language tags
+    lang_match = re.search(r'\[(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)(\s*\+\s*(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese))*\]', filename, re.IGNORECASE)
+    if lang_match:
+        languages = re.findall(r'(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)', lang_match.group(0), re.IGNORECASE)
+        languages = ['Tam' if lang.lower() in {'tam', 'tamil'} else
+                     'Tel' if lang.lower() in {'tel', 'telugu'} else
+                     'Hin' if lang.lower() in {'hin', 'hindi'} else
+                     'Mal' if lang.lower() in {'mal', 'malayalam'} else
+                     'Kan' if lang.lower() in {'kan', 'kannada'} else
+                     'Eng' if lang.lower() in {'eng', 'english'} else
+                     'Jpn' if lang.lower() in {'jpn', 'japanese'} else lang for lang in languages]
+        return f"[{' + '.join(sorted(set(languages)))}]"
+
+    if audio_count == 0:
+        # Fallback to filename single language
+        lang_match = re.search(r'\b(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)\b', filename, re.IGNORECASE)
+        if lang_match:
+            lang = lang_match.group(1).lower()
+            lang = 'Tam' if lang in {'tam', 'tamil'} else \
+                  'Tel' if lang in {'tel', 'telugu'} else \
+                  'Hin' if lang in {'hin', 'hindi'} else \
+                  'Mal' if lang in {'mal', 'malayalam'} else \
+                  'Kan' if lang in {'kan', 'kannada'} else \
+                  'Eng' if lang in {'eng', 'english'} else \
+                  'Jpn' if lang in {'jpn', 'japanese'} else lang
+            return lang
+        return None  # No audio label if no info
+
+    if audio_count > 1 and audio_languages:
+        unique_languages = sorted(set(lang for lang in audio_languages if lang != 'Unknown'))
+        if unique_languages:
+            return f"[{' + '.join(unique_languages)}]"
         return "Multi"
-    return ""
+
+    if audio_count == 1:
+        lang = audio_languages[0] if audio_languages else 'Unknown'
+        if lang == 'Jpn' and english_subs >= 1:
+            return "Sub"
+        if lang == 'Eng':
+            return "Dub"
+        return lang if lang != 'Unknown' else None
+
+    return "Multi" if audio_count > 1 else None
 
 def extract_title(source_text):
-    """Extract the show or movie title, preserving capitalization and handling special cases."""
+    """Extract the show or movie title, preserving capitalization."""
     if not source_text:
         return "Unknown"
     
@@ -981,18 +1097,22 @@ def extract_title(source_text):
     for pattern, _ in QUALITY_PATTERNS:
         text = pattern.sub("", text)
     
+    # Remove codec patterns
+    for pattern, _ in CODEC_PATTERNS:
+        text = pattern.sub("", text)
+    
     # Remove other common metadata
     metadata_patterns = [
-        r'\(.*?\)',  # Remove parentheses
-        r'\b\d{4}\b(?!\w)',  # Remove years, but not in titles like Laggam2024
-        r'\b(telugu|hindi|tamil|malayalam|kannada|english|japanese|sub|dub|dual|tri|multi|eng|jpn|esub)\b',  # Language/subtitle tags
-        r'\b(h264|h265|x264|x265|hevc|avc|aac|ac3|dts|flac|dd\+?5_1|192)\b',  # Codec/audio info
+        r'\b\d{4}\b(?!\w)',  # Remove years
+        r'\[(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)(\s*\+\s*(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese))*\]',  # Language tags
+        r'\b(aac|ac3|dts|flac|dd\+?5_1|192|2\.0)\b',  # Audio info
         r'\b(web-dl|webrip|bluray|bdrip|brrip|dvdrip|hdrip|hdtv|true_webdl|hq)\b',  # Source tags
         r'\b\d{2,4}mb\b',  # Size info
         r'[-.]Pahe\b',  # Release group
         r'\.[^\.]*?\.\d{3,4}p.*$',  # Episode names before quality
         r'[@\-]\w+',  # @username or -group tags
-        r'\[.*?\]',  # Brackets last
+        r'\[.*?\]',  # Brackets
+        r'\(.*?\)',  # Parentheses last
     ]
     
     for pattern in metadata_patterns:
@@ -1003,9 +1123,12 @@ def extract_title(source_text):
     text = text.replace('_', ' ').strip()
     text = re.sub(r'\s+', ' ', text)
     
-    # Capitalize words, preserving acronyms
+    # Capitalize words, preserving acronyms and special cases
     words = text.split()
-    title = ' '.join(word if word.isupper() else word.capitalize() for word in words)
+    title = ' '.join(word if word.isupper() or '.' in word else word.capitalize() for word in words)
+    
+    # Fix common apostrophes
+    title = title.replace("Takopi's", "Takopi’s")
     
     return title if title else "Unknown"
 
