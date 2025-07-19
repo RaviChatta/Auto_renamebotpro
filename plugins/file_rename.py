@@ -845,6 +845,7 @@ def extract_season_episode(filename):
     
     logger.debug(f"No season/episode pattern matched for {filename}, treating as movie")
     return None, None
+    
 def extract_quality(filename):
     """Extract video quality from filename, prioritizing source-based tags."""
     if not filename:
@@ -861,7 +862,7 @@ def extract_quality(filename):
     return None
 
 
-def extract_codec(filename, file_path):
+async def extract_codec(filename, file_path):
     """Extract codec from filename or ffprobe."""
     if not filename and not file_path:
         return None
@@ -910,6 +911,7 @@ def extract_codec(filename, file_path):
     except Exception as e:
         logger.error(f"Codec detection error: {e}")
         return None
+
 
 def extract_year(filename):
     """Extract year from filename."""
@@ -1030,45 +1032,54 @@ async def detect_audio_info(file_path):
     except Exception as e:
         logger.error(f"Audio detection error: {e}")
         return 0, 0, [], 0
+import re
 
 def get_audio_label(audio_info, filename):
     """Generate audio label based on audio and subtitle info or filename."""
     audio_count, sub_count, audio_languages, english_subs = audio_info
 
-    # Check filename for explicit language tags
-    lang_match = re.search(r'\[(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)(\s*\+\s*(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese))*\]', filename, re.IGNORECASE)
-    if lang_match:
-        languages = re.findall(r'(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)', lang_match.group(0), re.IGNORECASE)
-        languages = ['Tam' if lang.lower() in {'tam', 'tamil'} else
-                     'Tel' if lang.lower() in {'tel', 'telugu'} else
-                     'Hin' if lang.lower() in {'hin', 'hindi'} else
-                     'Mal' if lang.lower() in {'mal', 'malayalam'} else
-                     'Kan' if lang.lower() in {'kan', 'kannada'} else
-                     'Eng' if lang.lower() in {'eng', 'english'} else
-                     'Jpn' if lang.lower() in {'jpn', 'japanese'} else lang for lang in languages]
-        return f"[{' + '.join(sorted(set(languages)))}]"
+    LANG_MAP = {
+        'tam': 'Tam', 'tamil': 'Tam',
+        'tel': 'Tel', 'telugu': 'Tel',
+        'hin': 'Hin', 'hindi': 'Hin',
+        'mal': 'Mal', 'malayalam': 'Mal',
+        'kan': 'Kan', 'kannada': 'Kan',
+        'eng': 'Eng', 'english': 'Eng',
+        'jpn': 'Jpn', 'japanese': 'Jpn'
+    }
 
+    # Check filename for explicit language group
+    lang_match = re.search(
+        r'\[((?:\s*(?:Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)\s*\+?)+)\]',
+        filename, re.IGNORECASE
+    )
+    if lang_match:
+        raw_langs = re.findall(
+            r'(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)',
+            lang_match.group(0), re.IGNORECASE
+        )
+        normalized = [LANG_MAP.get(lang.lower(), lang) for lang in raw_langs]
+        return f"[{' + '.join(sorted(set(normalized)))}]"
+
+    # If no audio streams, fallback to filename single match
     if audio_count == 0:
-        # Fallback to filename single language
-        lang_match = re.search(r'\b(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)\b', filename, re.IGNORECASE)
+        lang_match = re.search(
+            r'\b(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)\b',
+            filename, re.IGNORECASE
+        )
         if lang_match:
             lang = lang_match.group(1).lower()
-            lang = 'Tam' if lang in {'tam', 'tamil'} else \
-                  'Tel' if lang in {'tel', 'telugu'} else \
-                  'Hin' if lang in {'hin', 'hindi'} else \
-                  'Mal' if lang in {'mal', 'malayalam'} else \
-                  'Kan' if lang in {'kan', 'kannada'} else \
-                  'Eng' if lang in {'eng', 'english'} else \
-                  'Jpn' if lang in {'jpn', 'japanese'} else lang
-            return lang
-        return None  # No audio label if no info
+            return LANG_MAP.get(lang, lang)
+        return None
 
+    # Multiple audio tracks
     if audio_count > 1 and audio_languages:
         unique_languages = sorted(set(lang for lang in audio_languages if lang != 'Unknown'))
         if unique_languages:
             return f"[{' + '.join(unique_languages)}]"
         return "Multi"
 
+    # Single audio
     if audio_count == 1:
         lang = audio_languages[0] if audio_languages else 'Unknown'
         if lang == 'Jpn' and english_subs >= 1:
@@ -1078,6 +1089,7 @@ def get_audio_label(audio_info, filename):
         return lang if lang != 'Unknown' else None
 
     return "Multi" if audio_count > 1 else None
+
 
 def extract_title(source_text):
     """Extract the show or movie title, preserving capitalization."""
