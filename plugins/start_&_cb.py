@@ -18,7 +18,7 @@ import pytz
 from functools import wraps
 import secrets
 import logging
-from plugins.extra.fonts import FONTS, apply_font
+from plugins.extra.font_string import FONTS, apply_font
 #from plugins.ai import *
 # Add this at the top of your file with other imports
 from typing import Dict, Optional
