@@ -373,7 +373,7 @@ async def start(client, message: Message):
             InlineKeyboardButton(text="ʀ", callback_data="help"),  # R
             InlineKeyboardButton(text="ɪ", callback_data="about"),       # I
             InlineKeyboardButton(text="ꜱ", callback_data="premiumx"),        # S
-            InlineKeyboardButton(text="ᴇ", callback_data="help")  # E
+            InlineKeyboardButton(text="ᴇ", callback_data="settings_menu")  # E
         ],
         [
             InlineKeyboardButton('ᴜᴘᴅᴀᴛᴇs', url= "https://t.me/TFIBOTS"),
