@@ -8,6 +8,7 @@ from math import ceil
 from functools import wraps
 from config import Config
 from datetime import datetime
+from pyrogram.enums import ParseMode  # Recommended import
 
 def check_ban_status(func):
     @wraps(func)
@@ -132,7 +133,7 @@ async def auto_rename_command(client, message):
                 "<b>•</b> Enable with <code>/autorename_on</code>  •  Disable with <code>/autorename_off</code>\n"
                 "<b>•</b> <code>{title}</code> extracts the main title, removing season/episode/quality/metadata.\n"
                 "<b>•</b> Use <code>{year}</code>, <code>{codec}</code> etc. to customize further.",
-                parse_mode="HTML"
+               
             )
             return
 
