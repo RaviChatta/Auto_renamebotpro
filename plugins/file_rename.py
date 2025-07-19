@@ -1032,12 +1032,13 @@ async def detect_audio_info(file_path):
     except Exception as e:
         logger.error(f"Audio detection error: {e}")
         return 0, 0, [], 0
-import re
 
-def get_audio_label(audio_info, filename):
+def get_audio_label(audio_info, filename=None):
     """Generate audio label based on audio and subtitle info or filename."""
+    if not audio_info:
+        return None
+        
     audio_count, sub_count, audio_languages, english_subs = audio_info
-
     LANG_MAP = {
         'tam': 'Tam', 'tamil': 'Tam',
         'tel': 'Tel', 'telugu': 'Tel',
@@ -1048,29 +1049,29 @@ def get_audio_label(audio_info, filename):
         'jpn': 'Jpn', 'japanese': 'Jpn'
     }
 
-    # Check filename for explicit language group
-    lang_match = re.search(
-        r'\[((?:\s*(?:Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)\s*\+?)+)\]',
-        filename, re.IGNORECASE
-    )
-    if lang_match:
-        raw_langs = re.findall(
-            r'(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)',
-            lang_match.group(0), re.IGNORECASE
-        )
-        normalized = [LANG_MAP.get(lang.lower(), lang) for lang in raw_langs]
-        return f"[{' + '.join(sorted(set(normalized)))}]"
-
-    # If no audio streams, fallback to filename single match
-    if audio_count == 0:
+    # Check filename for explicit language group if provided
+    if filename:
         lang_match = re.search(
-            r'\b(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)\b',
+            r'\[((?:\s*(?:Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)\s*\+?)+)\]',
             filename, re.IGNORECASE
         )
         if lang_match:
-            lang = lang_match.group(1).lower()
-            return LANG_MAP.get(lang, lang)
-        return None
+            raw_langs = re.findall(
+                r'(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)',
+                lang_match.group(0), re.IGNORECASE
+            )
+            normalized = [LANG_MAP.get(lang.lower(), lang) for lang in raw_langs]
+            return f"[{' + '.join(sorted(set(normalized)))}]"
+
+        # If no audio streams, fallback to filename single match
+        if audio_count == 0:
+            lang_match = re.search(
+                r'\b(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)\b',
+                filename, re.IGNORECASE
+            )
+            if lang_match:
+                lang = lang_match.group(1).lower()
+                return LANG_MAP.get(lang, lang)
 
     # Multiple audio tracks
     if audio_count > 1 and audio_languages:
@@ -1089,7 +1090,6 @@ def get_audio_label(audio_info, filename):
         return lang if lang != 'Unknown' else None
 
     return "Multi" if audio_count > 1 else None
-
 
 def extract_title(source_text):
     """Extract the show or movie title, preserving capitalization."""
@@ -1473,7 +1473,7 @@ async def auto_rename_files(client, message: Message):
                 await asyncio.sleep(1)
                 await msg.edit("**Dᴏᴡɴʟᴏᴀᴅɪɴɢ Cᴏᴍᴘʟᴇᴛᴇ**")
                 audio_info = await detect_audio_info(file_path)
-                audio_label = get_audio_label(audio_info)
+                audio_label = get_audio_label(audio_info, file_name)
                 actual_resolution = await detect_video_resolution(file_path)
 
                 replacements = {
