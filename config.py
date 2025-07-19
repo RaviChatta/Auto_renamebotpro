@@ -86,7 +86,7 @@ class Txt(object):
 ➲ <code>{chapter}</code> – Chapter (if any)
 
 <b>Formats:</b>  
-➲ <b>TV Series:</b> <code>[S{{season}}E{{episode}}] {{title}} [{{resolution}}] [{{audio}}]</code>  
+➲ <b>TV Series:</b> <code>[S{{season}} - E{{episode}}] {{title}} [{{resolution}}] [{{audio}}]</code>  
 ➲ <b>Movies:</b> <code>{{title}} ({{year}}) [{{resolution}}] [{{audio}}] [{{codec}}]</code>
 
 <b>Auto-Rename Toggle:</b>  
