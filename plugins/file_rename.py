@@ -794,6 +794,7 @@ async def check_premium_mode():
         )
 
 
+
 SEASON_EPISODE_PATTERNS = [
     (re.compile(r'\[S(\d{1,2})[\s\-]+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),  # [S01-E06]
     (re.compile(r'\[S(\d{1,2})[\s\-]+(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),  # [S01-06]
@@ -845,20 +846,26 @@ def extract_season_episode(filename):
     logger.debug(f"No season/episode pattern matched for {filename}, treating as movie")
     return None, None
 
-def extract_quality(filename):
-    """Extract video quality from filename, prioritizing source-based tags."""
-    if not filename:
-        return "1080p"
-    
+ def extract_quality(filename, file_path):
+    """Extract video quality from filename or ffprobe."""
+    if not filename and not file_path:
+        return "Unknown"
+
+    # Try ffprobe first for actual resolution
+    actual_resolution = await detect_video_resolution(file_path)
+    if actual_resolution:
+        return actual_resolution
+
+    # Fallback to filename
     for pattern, extractor in QUALITY_PATTERNS:
         match = pattern.search(filename)
         if match:
             quality = extractor(match)
-            logger.info(f"Extracted quality: {quality} from {filename}")
+            logger.info(f"Extracted quality from filename: {quality}")
             return quality
-    
-    logger.warning(f"No quality pattern matched for {filename}")
-    return "1080p"  # Default for movies
+
+    logger.debug(f"No quality pattern matched for {filename}")
+    return "Unknown"
 
 def extract_codec(filename, file_path):
     """Extract codec from filename or ffprobe."""
@@ -1464,54 +1471,60 @@ async def auto_rename_files(client, message: Message):
                 actual_resolution = await detect_video_resolution(file_path)
 
                 replacements = {
-                    '{season}': season or 'XX',
-                    '{episode}': episode or 'XX',
+                    '{season}': season or '',
+                    '{episode}': episode or '',
                     '{chapter}': chapter or 'XX',
                     '{volume}': volume or 'XX',
                     '{quality}': quality,
                     '{audio}': audio_label,
-                    '{Season}': season or 'XX',
-                    '{Episode}': episode or 'XX',
+                    '{Season}': season or '',
+                    '{Episode}': episode or '',
                     '{Chapter}': chapter or 'XX',
                     '{Volume}': volume or 'XX',
                     '{Quality}': quality,
                     '{Audio}': audio_label,
-                    '{SEASON}': season or 'XX',
-                    '{EPISODE}': episode or 'XX',
+                    '{SEASON}': season or '',
+                    '{EPISODE}': episode or '',
                     '{CHAPTER}': chapter or 'XX',
                     '{VOLUME}': volume or 'XX',
                     '{QUALITY}': quality,
                     '{AUDIO}': audio_label,
-                    'Season': season or 'XX',
-                    'Episode': episode or 'XX',
+                    'Season': season or '',
+                    'Episode': episode or '',
                     'Chapter': chapter or 'XX',
                     'Volume': volume or 'XX',
                     'Quality': quality,
                     'Audio': audio_label,
-                    'SEASON': season or 'XX',
-                    'EPISODE': episode or 'XX',
+                    'SEASON': season or '',
+                    'EPISODE': episode or '',
                     'CHAPTER': chapter or 'XX',
                     'VOLUME': volume or 'XX',
                     'QUALITY': quality,
                     'AUDIO': audio_label,
-                    'season': season or 'XX',
-                    'episode': episode or 'XX',
+                    'season': season or '',
+                    'episode': episode or '',
                     'chapter': chapter or 'XX',
                     'volume': volume or 'XX',
                     'quality': quality,
                     'audio': audio_label,
-                    '{resolution}': actual_resolution,
-                    '{Resolution}': actual_resolution,
-                    '{RESOLUTION}': actual_resolution,
-                    'resolution': actual_resolution,
-                    'Resolution': actual_resolution,
-                    'RESOLUTION': actual_resolution,
+                    '{resolution}': actual_resolution or '',
+                    '{Resolution}': actual_resolution or '',
+                    '{RESOLUTION}': actual_resolution or '',
+                    'resolution': actual_resolution or '',
+                    'Resolution': actual_resolution or '',
+                    'RESOLUTION': actual_resolution or '',
                     '{title}': title,  # Add title placeholder
                     '{Title}': title,
                     '{TITLE}': title,
                     'title': title,
                     'Title': title,
                     'TITLE': title,
+                    '{codec}': codec or '',
+                    '{Codec}': codec or '',
+                    '{CODEC}': codec or '',
+                    'codec': codec or '',
+                    'Codec': codec or '',
+                    'CODEC': codec or '',
                 }
 
                 for ph, val in replacements.items():
