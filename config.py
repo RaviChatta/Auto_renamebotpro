@@ -109,7 +109,7 @@ class Txt(object):
     
     THUMBNAIL_TXT = """<b><u>» ᴛᴏ ꜱᴇᴛ ᴄᴜꜱᴛᴏᴍ ᴛʜᴜᴍʙɴᴀɪʟ</u></b>
     
-➲ </code>/start</code>: ꜱᴇɴᴅ ᴀɴʏ ᴘʜᴏᴛᴏ ᴛᴏ ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ ꜱᴇᴛ ɪᴛ ᴀꜱ ᴀ ᴛʜᴜᴍʙɴᴀɪʟ.
+➲ </code>/set_thumb</code>: ꜱᴇɴᴅ ᴀɴʏ ᴘʜᴏᴛᴏ ᴛᴏ ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ ꜱᴇᴛ ɪᴛ ᴀꜱ ᴀ ᴛʜᴜᴍʙɴᴀɪʟ.
 ➲ </code>/del_thumb</code>: ᴜꜱᴇ ᴛʜɪꜱ ᴄᴏᴍᴍᴀɴᴅ ᴛᴏ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴏʟᴅ ᴛʜᴜᴍʙɴᴀɪʟ.
 ➲ </code>/view_thumb</code>: ᴜꜱᴇ ᴛʜɪꜱ ᴄᴏᴍᴍᴀɴᴅ ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴛʜᴜᴍʙɴᴀɪʟ.
 ➲ </code>/get_thumb</code>: ᴜsᴇ ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ᴛᴏ ᴇxᴛʀᴀᴄᴛ ᴛʜᴜᴍʙɴᴀɪʟ ғʀᴏᴍ ᴏᴛʜᴇʀ ᴠɪᴅᴇᴏs ᴏʀ ᴅᴏᴄ.
@@ -366,6 +366,28 @@ USAGE:
 ➲ </code>/metadata</code>: ᴄᴏᴍᴍᴀɴᴅꜱ ᴛᴏ ᴛᴜʀɴ ᴏɴ ᴏғғ ᴍᴇᴛᴀᴅᴀᴛᴀ.
 ➲ </code>/help</code>: ɢᴇᴛ ǫᴜɪᴄᴋ ᴀꜱꜱɪꜱᴛᴀɴᴄᴇ.
 """
+    ADMIN_TXT = """
+📚 Here are my commands list for Admins ⇊
+
+➲ </code>/token_usage</code>: ᴛᴏ ᴛᴜʀɴ ᴏɴ/ᴏꜰꜰ ᴛᴏᴋᴇɴ ᴜꜱᴀɢᴇ.
+➲ </code>/info</code>: sʏꜱᴛᴇᴍ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ.
+➲ </code>/add_premium</code>: ᴀᴅᴅ ᴀɴʏ ᴜꜱᴇʀ ᴛᴏ ᴘʀᴇᴍɪᴜᴍ.
+➲ </code>/remove_premium</code>: ʀᴇᴍᴏᴠᴇ ᴀɴʏ ᴜꜱᴇʀ ꜰʀᴏᴍ ᴘʀᴇᴍɪᴜᴍ.
+➲ </code>/premium_users</code>: ɢᴇᴛ ʟɪꜱᴛ ᴏꜰ ᴘʀᴇᴍɪᴜᴍ ᴜꜱᴇʀꜱ.
+➲ </code>/ban</code>: ʙᴀɴ ᴀ ᴜꜱᴇʀ [ᴀᴅᴍɪɴ ᴏɴʟʏ].
+➲ </code>/unban</code>: ᴛᴏ ᴜɴʙᴀɴ ᴀ ᴜꜱᴇʀ [ᴀᴅᴍɪɴ ᴏɴʟʏ].
+➲ </code>/broadcast</code>: ʙʀᴏᴀᴅᴄᴀꜱᴛ ᴀ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴀʟʟ ᴜꜱᴇʀꜱ.
+➲ </code>/admin_mode</code>: ᴛᴏɢɢʟᴇ ᴀᴅᴍɪɴ ᴍᴏᴅᴇ ᴏɴ/ᴏꜰꜰ.
+➲ </code>/add_admin</code>: ᴀᴅᴅ ᴀ sᴜᴅᴏ ᴜꜱᴇʀ.
+➲ </code>/status</code>: ᴄʜᴇᴄᴋ ʙᴏᴛ sᴛᴀᴛᴜꜱ.
+➲ </code>/users</code>: ᴄʜᴇᴄᴋ ᴀʟʟ ʙᴏᴛ ᴜꜱᴇʀꜱ.
+➲ </code>/add_token</code>: ᴀᴅᴅ ᴛᴏᴋᴇɴ ᴛᴏ ᴀ ᴜꜱᴇʀ.
+➲ </code>/addfsub</code>: ᴀᴅᴅ ғᴏʀᴄᴇ ꜱᴜʙꜱᴄʀɪᴘᴛɪᴏɴ ᴄʜᴀɴɴᴇʟ.
+➲ </code>/delfsub</code>: ʀᴇᴍᴏᴠᴇ ғᴏʀᴄᴇ ꜱᴜʙᴄʀɪᴘᴛɪᴏɴ ᴄʜᴀɴɴᴇʟ.
+➲ </code>/channels</code>: ᴠɪᴇᴡ ᴀʟʟ ғꜱᴜʙ ᴄʜᴀɴɴᴇʟꜱ.
+➲ </code>/restart</code>: ʀᴇꜱᴛᴀʀᴛ ᴛʜᴇ ʙᴏᴛ.
+"""
+
     STICKER_TXT = """ <b> 
 
 ›› </code>/stickerid</code> : ᴛᴏ ɢᴇᴛ ꜱᴛɪᴄᴋᴇʀ 
