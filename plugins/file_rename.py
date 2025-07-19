@@ -1429,7 +1429,7 @@ async def auto_rename_files(client, message: Message):
             quality = extract_quality(source_text)
             title = extract_title(source_text)
             codec = await extract_codec(source_text, None)  # Extract codec from filename first
-    
+            year = extract_year(source_text)  # Extract year from source text
             if not format_template:
                 return await message.reply_text("**Aᴜᴛᴏ ʀᴇɴᴀᴍᴇ ғᴏʀᴍᴀᴛ ɴᴏᴛ sᴇᴛ\nPʟᴇᴀsᴇ sᴇᴛ ᴀ ʀᴇɴᴀᴍᴇ ғᴏʀᴍᴀᴛ ᴜsɪɴɢ /autorename**")
     
@@ -1478,8 +1478,7 @@ async def auto_rename_files(client, message: Message):
                 audio_label = get_audio_label(audio_info, file_name)  # Pass file_name as fallback
                 actual_resolution = await detect_video_resolution(file_path)
                 # Re-extract codec using the downloaded file for accuracy
-                codec = await extract_codec(file_name, file_path)
-    
+                codec = await extract_codec(file_name, file_path)  # Re-extract codec with file_path    
                 replacements = {
                     '{season}': season or '',
                     '{episode}': episode or '',
@@ -1535,6 +1534,12 @@ async def auto_rename_files(client, message: Message):
                     'codec': codec or '',
                     'Codec': codec or '',
                     'CODEC': codec or '',
+                    '{year}': year or '',  # Add year placeholders
+                    '{Year}': year or '',
+                    '{YEAR}': year or '',
+                    'year': year or '',
+                    'Year': year or '',
+                    'YEAR': year or '',
                 }
     
                 new_filename = f"{format_template.format(**replacements)}{ext}"
