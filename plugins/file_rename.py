@@ -845,8 +845,7 @@ def extract_season_episode(filename):
     
     logger.debug(f"No season/episode pattern matched for {filename}, treating as movie")
     return None, None
-
- def extract_quality(filename, file_path):
+def extract_quality(filename, file_path):
     """Extract video quality from filename or ffprobe."""
     if not filename and not file_path:
         return "Unknown"
