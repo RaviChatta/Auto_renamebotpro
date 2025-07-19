@@ -106,25 +106,34 @@ async def auto_rename_command(client, message):
 
         # Extract template from command
         command_parts = message.text.split(maxsplit=1)
+  
         if len(command_parts) < 2 or not command_parts[1].strip():
             await message.reply_text(
                 "<b>⚠️ Please provide a rename template.</b>\n\n"
-                "<b>🧾 Format:</b>\n"
-                "<code>/autorename [S{season}E{episode}] {title} [{resolution}] [{audio}]</code>\n\n"
-                "<b>🎬 Input:</b>\n"
+        
+                "<b>🧾 Format (Series):</b>\n"
+                "<code>/autorename [S{season}E{episode}] {title} [{resolution}] [{audio}]</code>\n"
+                
+                "<b>🧾 Format (Movies):</b>\n"
+                "<code>/autorename {title} ({year}) [{resolution}] [{audio}] [{codec}]</code>\n\n"
+        
+                "<b>📺 Series Input:</b>\n"
                 "<code>World Trigger S01E03 [1080p] [Dual].mkv</code>\n"
                 "<b>📁 Output:</b>\n"
                 "<code>[S01E03] World Trigger [1080p] [Dual].mkv</code>\n\n"
-                "<b>🎬 Input (Movie):</b>\n"
+        
+                "<b>🎬 Movie Input:</b>\n"
                 "<code>Firefly (2025) HQ HDRip - x264 - [Tam + Tel + Hin + Mal] - (AAC 2.0) - 850MB - ESub.mkv</code>\n"
                 "<b>📁 Output:</b>\n"
                 "<code>Firefly (2025) [HDRip] [Tam + Tel + Hin + Mal] [x264].mkv</code>\n\n"
+        
                 "<b>📌 Notes:</b>\n"
-                • The bot will use this template to rename your files automatically.\n"
-                • Enable with <code>/autorename_on</code> • Disable with <code>/autorename_off</code>\n"
-                • <code>{title}</code> extracts the main title, removing season/episode/quality/metadata."
+                "<b>•</b> The bot will use this template to rename your files automatically.\n"
+                "<b>•</b> Enable with <code>/autorename_on</code>  •  Disable with <code>/autorename_off</code>\n"
+                "<b>•</b> <code>{title}</code> extracts the main title, removing season/episode/quality/metadata.\n"
+                "<b>•</b> Use <code>{year}</code>, <code>{codec}</code> etc. to customize further.",
+                parse_mode="HTML"
             )
-
             return
 
         # Save template for user or process further
