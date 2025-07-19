@@ -742,12 +742,12 @@ async def global_premium_control(client, message: Message):
     args = message.command[1:]
     if not args:
         status = "ON" if PREMIUM_MODE else "OFF"
-        expiry = f" (expires {PREMIUM_MODE_EXPIRY:%Y-%m-%d %H:%M})" if PREMIUM_MODE_EXPIRY else ""
+        expiry = f" (expires {PREMIUM_MODE_EXPIRY:%Y-%m-%d %H:%M})" if isinstance(PREMIUM_MODE_EXPIRY, datetime) else ""
         return await message.reply_text(
             f"**➠ Cᴜʀʀᴇɴᴛ Tᴏᴋᴇɴ Usᴀɢᴇ: {status}{expiry}**\n\n"
             "**Usᴀɢᴇ:**\n"
-            "`/token_usage on [days|12m|1y`  — Eɴᴀʙʟᴇ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ\n"
-            "`/token_usage off [days|12m|1y` — Dɪsᴀʙʟᴇ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ"
+            "`/token_usage on [days|12m|1y]` — Eɴᴀʙʟᴇ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ\n"
+            "`/token_usage off [days|12m|1y]` — Dɪsᴀʙʟᴇ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ"
         )
 
     action = args[0].lower()
@@ -775,7 +775,7 @@ async def global_premium_control(client, message: Message):
         upsert=True
     )
     await message.reply_text(msg)
-
+    
 async def check_premium_mode():
     global PREMIUM_MODE, PREMIUM_MODE_EXPIRY
 
@@ -786,11 +786,12 @@ async def check_premium_mode():
     PREMIUM_MODE = settings.get("status", True)
     PREMIUM_MODE_EXPIRY = settings.get("expiry", None)
 
-    if PREMIUM_MODE_EXPIRY and datetime.now() > PREMIUM_MODE_EXPIRY:
-        PREMIUM_MODE = True
+    if PREMIUM_MODE_EXPIRY and isinstance(PREMIUM_MODE_EXPIRY, datetime) and datetime.now() > PREMIUM_MODE_EXPIRY:
+        PREMIUM_MODE = False  # Changed to disable premium mode on expiry
+        PREMIUM_MODE_EXPIRY = None
         await DARKXSIDE78.global_settings.update_one(
             {"_id": "premium_mode"},
-            {"$set": {"status": PREMIUM_MODE}}
+            {"$set": {"status": PREMIUM_MODE, "expiry": PREMIUM_MODE_EXPIRY}}
         )
 
 
@@ -1381,7 +1382,7 @@ async def auto_rename_files(client, message: Message):
         metadata_path = None
         thumb_path = None
         output_path = None
-
+    
         try:
             media_preference = await DARKXSIDE78.get_media_preference(user_id)
             user_data = await DARKXSIDE78.col.find_one({"_id": user_id})
@@ -1398,7 +1399,7 @@ async def auto_rename_files(client, message: Message):
                         {"$set": {"is_premium": False, "premium_expiry": None}}
                     )
                     is_premium = False
-
+    
             if not is_premium:
                 current_tokens = user_data.get("token", Config.DEFAULT_TOKEN)
                 if current_tokens <= 0:
@@ -1421,26 +1422,27 @@ async def auto_rename_files(client, message: Message):
                 source_text = message.caption
             else:
                 source_text = file_name
-
+    
             season, episode = extract_season_episode(source_text)
             chapter = extract_chapter(source_text)
             volume = extract_volume(source_text)
             quality = extract_quality(source_text)
-            title = extract_title(source_text)  # Extract title
-
+            title = extract_title(source_text)
+            codec = await extract_codec(source_text, None)  # Extract codec from filename first
+    
             if not format_template:
                 return await message.reply_text("**Aᴜᴛᴏ ʀᴇɴᴀᴍᴇ ғᴏʀᴍᴀᴛ ɴᴏᴛ sᴇᴛ\nPʟᴇᴀsᴇ sᴇᴛ ᴀ ʀᴇɴᴀᴍᴇ ғᴏʀᴍᴀᴛ ᴜsɪɴɢ /autorename**")
-
+    
             if file_id in renaming_operations:
                 elapsed_time = (datetime.now() - renaming_operations[file_id]).seconds
                 if elapsed_time < 10:
                     return
-
+    
             renaming_operations[file_id] = datetime.now()
-
+    
             try:
                 audio_label = ""
-
+    
                 if media_type == "video" and media_preference == "document":
                     ext = ".mkv"
                 elif media_type == "document" and media_preference == "video":
@@ -1449,15 +1451,15 @@ async def auto_rename_files(client, message: Message):
                     ext = ".pdf"
                 else:
                     ext = os.path.splitext(file_name)[1] or ('.mp4' if media_type == 'video' else '.mp3')
-
+    
                 download_path = f"downloads/{file_name}"
                 metadata_path = f"metadata/{file_name}"
                 output_path = f"processed/{os.path.splitext(file_name)[0]}{ext}"
-
+    
                 await aiofiles.os.makedirs(os.path.dirname(download_path), exist_ok=True)
                 await aiofiles.os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
                 await aiofiles.os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
+    
                 msg = await message.reply_text("**Dᴏᴡɴʟᴏᴀᴅɪɴɢ...**")
                 try:
                     file_path = await client.download_media(
@@ -1469,62 +1471,64 @@ async def auto_rename_files(client, message: Message):
                 except Exception as e:
                     await msg.edit(f"Dᴏᴡɴʟᴏᴀᴅ ғᴀɪʟᴇᴅ: {e}")
                     raise
-
+    
                 await asyncio.sleep(1)
                 await msg.edit("**Dᴏᴡɴʟᴏᴀᴅɪɴɢ Cᴏᴍᴘʟᴇᴛᴇ**")
                 audio_info = await detect_audio_info(file_path)
-                audio_label = get_audio_label(audio_info, file_name)
+                audio_label = get_audio_label(audio_info, file_name)  # Pass file_name as fallback
                 actual_resolution = await detect_video_resolution(file_path)
-
+                # Re-extract codec using the downloaded file for accuracy
+                codec = await extract_codec(file_name, file_path)
+    
                 replacements = {
                     '{season}': season or '',
                     '{episode}': episode or '',
                     '{chapter}': chapter or 'XX',
                     '{volume}': volume or 'XX',
-                    '{quality}': quality,
-                    '{audio}': audio_label,
+                    '{quality}': quality or '',
+                    '{audio}': audio_label or '',
                     '{Season}': season or '',
                     '{Episode}': episode or '',
                     '{Chapter}': chapter or 'XX',
                     '{Volume}': volume or 'XX',
-                    '{Quality}': quality,
-                    '{Audio}': audio_label,
+                    '{Quality}': quality or '',
+                    '{Audio}': audio_label or '',
                     '{SEASON}': season or '',
                     '{EPISODE}': episode or '',
                     '{CHAPTER}': chapter or 'XX',
                     '{VOLUME}': volume or 'XX',
-                    '{QUALITY}': quality,
-                    '{AUDIO}': audio_label,
-                    'Season': season or '',
-                    'Episode': episode or '',
-                    'Chapter': chapter or 'XX',
-                    'Volume': volume or 'XX',
-                    'Quality': quality,
-                    'Audio': audio_label,
-                    'SEASON': season or '',
-                    'EPISODE': episode or '',
-                    'CHAPTER': chapter or 'XX',
-                    'VOLUME': volume or 'XX',
-                    'QUALITY': quality,
-                    'AUDIO': audio_label,
+                    '{QUALITY}': quality or '',
+                    '{AUDIO}': audio_label or '',
                     'season': season or '',
                     'episode': episode or '',
                     'chapter': chapter or 'XX',
                     'volume': volume or 'XX',
-                    'quality': quality,
-                    'audio': audio_label,
+                    'quality': quality or '',
+                    'audio': audio_label or '',
+                    'Season': season or '',
+                    'Episode': episode or '',
+                    'Chapter': chapter or 'XX',
+                    'Volume': volume or 'XX',
+                    'Quality': quality or '',
+                    'Audio': audio_label or '',
+                    'SEASON': season or '',
+                    'EPISODE': episode or '',
+                    'CHAPTER': chapter or 'XX',
+                    'VOLUME': volume or 'XX',
+                    'QUALITY': quality or '',
+                    'AUDIO': audio_label or '',
                     '{resolution}': actual_resolution or '',
                     '{Resolution}': actual_resolution or '',
                     '{RESOLUTION}': actual_resolution or '',
                     'resolution': actual_resolution or '',
                     'Resolution': actual_resolution or '',
                     'RESOLUTION': actual_resolution or '',
-                    '{title}': title,  # Add title placeholder
-                    '{Title}': title,
-                    '{TITLE}': title,
-                    'title': title,
-                    'Title': title,
-                    'TITLE': title,
+                    '{title}': title or '',
+                    '{Title}': title or '',
+                    '{TITLE}': title or '',
+                    'title': title or '',
+                    'Title': title or '',
+                    'TITLE': title or '',
                     '{codec}': codec or '',
                     '{Codec}': codec or '',
                     '{CODEC}': codec or '',
@@ -1532,20 +1536,16 @@ async def auto_rename_files(client, message: Message):
                     'Codec': codec or '',
                     'CODEC': codec or '',
                 }
-
-                for ph, val in replacements.items():
-                    format_template = format_template.replace(ph, val)
-
+    
                 new_filename = f"{format_template.format(**replacements)}{ext}"
                 new_download = os.path.join("downloads", new_filename)
                 new_metadata = os.path.join("metadata", new_filename)
                 new_output = os.path.join("processed", new_filename)
-
+    
                 await aiofiles.os.rename(download_path, new_download)
                 download_path = new_download
                 metadata_path = new_metadata
                 output_path = new_output
-
                 await msg.edit("**Pʀᴏᴄᴇssɪɴɢ ғɪʟᴇ...**")
                 
                 if media_type == "video" and media_preference == "document":
@@ -2009,7 +2009,11 @@ async def bot_info(client: Client, message: Message):
 
         # Premium mode status
         premium_status = "ON" if PREMIUM_MODE else "OFF"
-        premium_expiry = f" (expires {PREMIUM_MODE_EXPIRY:%Y-%m-%d %H:%M})" if PREMIUM_MODE_EXPIRY else ""
+        premium_expiry = ""
+        if PREMIUM_MODE and isinstance(PREMIUM_MODE_EXPIRY, datetime):
+            premium_expiry = f" (expires {PREMIUM_MODE_EXPIRY:%Y-%m-%d %H:%M})"
+        elif PREMIUM_MODE and PREMIUM_MODE_EXPIRY is not None:
+            premium_expiry = " (invalid expiry format)"
 
         # Format response
         response = (
@@ -2045,7 +2049,7 @@ async def bot_info(client: Client, message: Message):
     except Exception as e:
         logger.error(f"Info command error: {str(e)}", exc_info=True)
         await message.reply_text(f"⚠️ Error generating stats: {str(e)}")
-
+        
 @Client.on_message(filters.command("set_pdf_banner_place"))
 @check_ban_status
 async def set_pdf_banner_place_cmd(client, message: Message):
