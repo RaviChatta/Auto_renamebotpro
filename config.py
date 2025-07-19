@@ -73,25 +73,33 @@ class Txt(object):
 
 » ɪ ᴀᴍ ᴀᴅᴠᴀɴᴄᴇᴅ ʀᴇɴᴀᴍᴇ ʙᴏᴛ! ᴡʜɪᴄʜ ᴄᴀɴ ᴀᴜᴛᴏʀᴇɴᴀᴍᴇ ʏᴏᴜʀ ғɪʟᴇs ᴡɪᴛʜ ᴄᴜsᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ ᴀɴᴅ ᴛʜᴜᴍʙɴᴀɪʟ ᴀɴᴅ ᴀʟsᴏ sᴇǫᴜᴇɴᴄᴇ ᴛʜᴇᴍ ᴘᴇʀғᴇᴄᴛʟʏ</b>"""
     
-    FILE_NAME_TXT = f"""<b>» <u>sᴇᴛᴜᴘ ᴀᴜᴛᴏ ʀᴇɴᴀᴍᴇ ғᴏʀᴍᴀᴛ</u></b>
+    FILE_NAME_TXT = f"""<b>» <u>Setup Auto-Rename Format</u></b>
 
-<b>ᴠᴀʀɪᴀʙʟᴇꜱ :</b>
-➲ ᴇᴘɪꜱᴏᴅᴇ - ᴛᴏ ʀᴇᴘʟᴀᴄᴇ ᴇᴘɪꜱᴏᴅᴇ ɴᴜᴍʙᴇʀ  
-➲ ǫᴜᴀʟɪᴛʏ - ᴛᴏ ʀᴇᴘʟᴀᴄᴇ ǫᴜᴀʟɪᴛʏ  
-➲ sᴇᴀsᴏɴ - ᴛᴏ ʀᴇᴘʟᴀᴄᴇ sᴇᴀsᴏɴ  
-➲ ᴀᴜᴅɪᴏ - ᴛᴏ ʀᴇᴘʟᴀᴄᴇ ᴀᴜᴅɪᴏ
-➲ ᴄʜᴀᴘᴛᴇʀ - ᴛᴏ ʀᴇᴘʟᴀᴄᴇ ᴄʜᴀᴘᴛᴇʀ
+<b>Available Variables:</b>
+➲ <code>{season}</code> – Season number  
+➲ <code>{episode}</code> – Episode number  
+➲ <code>{title}</code> – Main title  
+➲ <code>{year}</code> – Year (for movies)  
+➲ <code>{resolution}</code> – Video resolution  
+➲ <code>{audio}</code> – Audio language or format  
+➲ <code>{codec}</code> – Video codec  
+➲ <code>{chapter}</code> – Chapter (if any)
 
-<b>‣ ᴇxᴀᴍᴘʟᴇ :</b>  
-<code>/autorename [Sseason-episode] One Piece [quality] [audio] @sompapidi</code>
+<b>Formats:</b>  
+➲ <b>TV Series:</b> <code>[S{season}E{episode}] {title} [{resolution}] [{audio}]</code>  
+➲ <b>Movies:</b> <code>{title} ({year}) [{resolution}] [{audio}] [{codec}]</code>
 
-<b>‣ /autorename:</b>  
-ʀᴇɴᴀᴍᴇ ʏᴏᴜʀ ᴍᴇᴅɪᴀ ꜰɪʟᴇꜱ ʙʏ ᴜꜱɪɴɢ 'ᴇᴘɪꜱᴏᴅᴇ', 'sᴇᴀsᴏɴ', 'ᴀᴜᴅɪᴏ', 'ʀᴇsᴏʟᴜᴛɪᴏɴ' ᴀɴᴅ 'ǫᴜᴀʟɪᴛʏ' ᴠᴀʀɪᴀʙʟᴇꜱ ɪɴ ʏᴏᴜʀ ꜰᴏʀᴍᴀᴛ ᴛᴇxᴛ.  
-ᴛʜᴇʏ ᴡɪʟʟ ʙᴇ ᴇxᴛʀᴀᴄᴛᴇᴅ ꜰʀᴏᴍ ᴛʜᴇ ᴏʀɪɢɪɴᴀʟ ꜰɪʟᴇɴᴀᴍᴇ ᴀɴᴅ ᴜꜱᴇᴅ ɪɴ ʀᴇɴᴀᴍɪɴɢ.
+<b>Auto-Rename Toggle:</b>  
+➲ <code>/autorename_on</code> – Enable auto-renaming  
+➲ <code>/autorename_off</code> – Disable auto-renaming
 
-<b>‣ ᴀᴜᴛᴏʀᴇɴᴀᴍᴇ ᴛᴏɢɢʟᴇ :</b>  
-➲ <code>/autorename_on</code> - ᴇɴᴀʙʟᴇ ᴀᴜᴛᴏ ʀᴇɴᴀᴍɪɴɢ  
-➲ <code>/autorename_off</code> - ᴅɪsᴀʙʟᴇ ᴀᴜᴛᴏ ʀᴇɴᴀᴍɪɴɢ  
+<b>Usage:</b>  
+Use the above variables in your rename format with the <code>/autorename</code> command.  
+The bot will extract values from the filename and apply them automatically.
+
+<b>⚠️ Disclaimer:</b>  
+Title and season extraction may vary depending on filename format.  
+Please test with a few files first to ensure proper results.
 """
 
 
