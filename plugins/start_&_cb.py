@@ -369,7 +369,7 @@ async def start(client, message: Message):
 
     buttons = InlineKeyboardMarkup([
         [   # A R I S E row at the top
-            InlineKeyboardButton(text="ᴀ", callback_data="help"),       # A
+            InlineKeyboardButton(text="ᴀ", callback_data="admin_cmds"),       # A
             InlineKeyboardButton(text="ʀ", callback_data="help"),  # R
             InlineKeyboardButton(text="ɪ", callback_data="about"),       # I
             InlineKeyboardButton(text="ꜱ", callback_data="premiumx"),        # S
@@ -429,7 +429,7 @@ async def cb_handler(client, query: CallbackQuery):
             text=Txt.START_TXT.format(query.from_user.mention),
             disable_web_page_preview=True,
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton('ᴜᴘᴅᴀᴛᴇs', url=f'https://t.me/mymopies'), InlineKeyboardButton('sᴜᴘᴘᴏʀᴛ', url=f'https://t.me/mymopies')],
+                [InlineKeyboardButton('ᴜᴘᴅᴀᴛᴇs', url=f'https://t.me/TFIBOTS'), InlineKeyboardButton('sᴜᴘᴘᴏʀᴛ', url=f'https://t.me/TFIBOTS_SUPPORT')],
                 [InlineKeyboardButton('ᴀʙᴏᴜᴛ', callback_data='about'), InlineKeyboardButton('ᴘʀᴇᴍɪᴜᴍ', callback_data='premiumx')],
                 [InlineKeyboardButton("ᴄᴏᴍᴍᴀɴᴅs", callback_data='help')]
             ])
@@ -442,7 +442,14 @@ async def cb_handler(client, query: CallbackQuery):
                 [InlineKeyboardButton("ᴄʟᴏsᴇ", callback_data="close"), InlineKeyboardButton("ʙᴀᴄᴋ", callback_data="help")]
             ])
         )
-
+    elif data == "admin_cmds":
+        await query.message.edit_text(
+            text=Txt.ADMIN_TXT,
+            disable_web_page_preview=True,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("ᴄʟᴏsᴇ", callback_data="close"), InlineKeyboardButton("ʙᴀᴄᴋ", callback_data="help")]
+            ])
+        )
     elif data == "help":
         await query.message.edit_text(
             text=Txt.HELP_TXT.format(client.mention),
