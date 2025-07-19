@@ -112,6 +112,7 @@ async def auto_rename_command(client, message):
                 "**🧾 Fᴏʀᴍᴀᴛ:** `<code>/autorename [S{season}E{episode}] {title} [{resolution}] [{audio}]</code>`\n"
                 "**🎬 Iɴᴘᴜᴛ:** `World Trigger S01E03 [1080p] [Dual].mkv`\n"
                 "**📁 Oᴜᴛᴘᴜᴛ:** `[S01E03] World Trigger [1080p] [Dual]`\n\n"
+                 {title} [{resolution}] [{audio}] for movies.
                 "**📌 Nᴏᴛᴇs:**\n"
                 "- Tʜᴇ ʙᴏᴛ ᴡɪʟʟ ᴜsᴇ ᴛʜɪs ᴛᴇᴍᴘʟᴀᴛᴇ ᴛᴏ ʀᴇɴᴀᴍᴇ ʏᴏᴜʀ ғɪʟᴇs ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ.\n"
                 "- Eɴᴀʙʟᴇ ᴡɪᴛʜ `/autorename_on`  •  Dɪsᴀʙʟᴇ ᴡɪᴛʜ `/autorename_off`\n"
