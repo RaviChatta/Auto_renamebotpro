@@ -845,26 +845,21 @@ def extract_season_episode(filename):
     
     logger.debug(f"No season/episode pattern matched for {filename}, treating as movie")
     return None, None
-def extract_quality(filename, file_path):
-    """Extract video quality from filename or ffprobe."""
-    if not filename and not file_path:
-        return "Unknown"
-
-    # Try ffprobe first for actual resolution
-    actual_resolution = await detect_video_resolution(file_path)
-    if actual_resolution:
-        return actual_resolution
-
-    # Fallback to filename
+def extract_quality(filename):
+    """Extract video quality from filename, prioritizing source-based tags."""
+    if not filename:
+        return None
+    
     for pattern, extractor in QUALITY_PATTERNS:
         match = pattern.search(filename)
         if match:
             quality = extractor(match)
-            logger.info(f"Extracted quality from filename: {quality}")
+            logger.info(f"Extracted quality: {quality} from {filename}")
             return quality
-
+    
     logger.debug(f"No quality pattern matched for {filename}")
-    return "Unknown"
+    return None
+
 
 def extract_codec(filename, file_path):
     """Extract codec from filename or ffprobe."""
