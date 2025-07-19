@@ -821,7 +821,7 @@ QUALITY_PATTERNS = [
     (re.compile(r'\b(\d{3,4}[pi])\b', re.IGNORECASE), lambda m: m.group(1)),  # 1080i
     (re.compile(r'\b(4kX264|4kx265)\b', re.IGNORECASE), lambda m: "2160p"),  # 4kX264
     (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1)),  # [1080p]
-    (re.compile(r'\b(240p|360p|480p|576p)\b', re.IGNORECASE), lambda m: m.group(1)),  # Low resolutions
+    (re.compile(r'\b(360p|480p|576p)\b', re.IGNORECASE), lambda m: m.group(1)),  # Low resolutions
 ]
 
 CODEC_PATTERNS = [
