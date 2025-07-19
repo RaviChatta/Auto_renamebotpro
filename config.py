@@ -73,7 +73,7 @@ class Txt(object):
 
 » ɪ ᴀᴍ ᴀᴅᴠᴀɴᴄᴇᴅ ʀᴇɴᴀᴍᴇ ʙᴏᴛ! ᴡʜɪᴄʜ ᴄᴀɴ ᴀᴜᴛᴏʀᴇɴᴀᴍᴇ ʏᴏᴜʀ ғɪʟᴇs ᴡɪᴛʜ ᴄᴜsᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ ᴀɴᴅ ᴛʜᴜᴍʙɴᴀɪʟ ᴀɴᴅ ᴀʟsᴏ sᴇǫᴜᴇɴᴄᴇ ᴛʜᴇᴍ ᴘᴇʀғᴇᴄᴛʟʏ</b>"""
     
-    FILE_NAME_TXT = f"""<b>» <u>Setup Auto-Rename Format</u></b>
+    FILE_NAME_TXT = """<b>» <u>Setup Auto-Rename Format</u></b>
 
 <b>Available Variables:</b>
 ➲ <code>{season}</code> – Season number  
@@ -86,8 +86,8 @@ class Txt(object):
 ➲ <code>{chapter}</code> – Chapter (if any)
 
 <b>Formats:</b>  
-➲ <b>TV Series:</b> <code>[S{season}E{episode}] {title} [{resolution}] [{audio}]</code>  
-➲ <b>Movies:</b> <code>{title} ({year}) [{resolution}] [{audio}] [{codec}]</code>
+➲ <b>TV Series:</b> <code>[S{{season}}E{{episode}}] {{title}} [{{resolution}}] [{{audio}}]</code>  
+➲ <b>Movies:</b> <code>{{title}} ({{year}}) [{{resolution}}] [{{audio}}] [{{codec}}]</code>
 
 <b>Auto-Rename Toggle:</b>  
 ➲ <code>/autorename_on</code> – Enable auto-renaming  
@@ -96,11 +96,11 @@ class Txt(object):
 <b>Usage:</b>  
 Use the above variables in your rename format with the <code>/autorename</code> command.  
 The bot will extract values from the filename and apply them automatically.
-
 <b>⚠️ Disclaimer:</b>  
 Title and season extraction may vary depending on filename format.  
 Please test with a few files first to ensure proper results.
 """
+
 
 
     ABOUT_TXT = f"""<b>❍ ᴍʏ ɴᴀᴍᴇ : <a href="https://t.me/{Config.BOT_USERNAME}">{Config.BOT_NAME}</a>
@@ -137,7 +137,7 @@ Please test with a few files first to ensure proper results.
 
 » ꜰᴏʀ ᴇx:- /set_caption ꜰɪʟᴇ ɴᴀᴍᴇ: {filesize}"""
 
-    PROGRESS_BAR = """\n
+    PROGRESS_BAR = """
 <b>» Sɪᴢᴇ</b> : {1} | {2}
 <b>» Dᴏɴᴇ</b> : {0}%
 <b>» Sᴘᴇᴇᴅ</b> : {3}/s
