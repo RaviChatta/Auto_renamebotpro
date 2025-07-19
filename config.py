@@ -360,8 +360,8 @@ USAGE:
 ➲ </code>/renamed</code>: ᴛᴏ ᴠɪᴇᴡ ʀᴇɴᴀᴍᴇᴅ sᴛᴀᴛs.
 ➲ </code>/rename_history</code>: ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ʀᴇɴᴀᴍɪɴɢ ʜɪsᴛᴏʀʏ.
 ➲ </code>/setmedia</code>: ᴛᴏ sᴇᴛ ᴍᴇᴅɪᴀ ᴛʏᴘᴇ ɪɴ ʏᴏᴜʀ ʙᴏᴛ.
-➲ </code>/token_usage</code>: ᴛᴏ ᴛᴜʀɴ ᴏɴ ᴏғғ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ.
 ➲ </code>/set_caption</code>: ᴛᴏ ꜱᴇᴛ ᴀ ᴄᴜꜱᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ.
+➲ </code>\set_source</code>: ᴛᴏ ꜱᴇᴛ ᴀ ʀᴇɴᴀᴍᴇ ꜱᴏᴜʀᴄᴇ
 ➲ </code>/view_caption</code>: ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴄᴀᴘᴛɪᴏɴ.
 ➲ </code>/del_caption</code>: ᴛᴏ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴄᴀᴘᴛɪᴏɴ.
 ➲ </code>/setthumb</code>: ᴛᴏ sᴇᴛ ᴄᴜꜱᴛᴏᴍ ᴛʜᴜᴍʙɴᴀɪʟ.
@@ -390,9 +390,6 @@ USAGE:
 ➲ </code>/status</code>: ᴄʜᴇᴄᴋ ʙᴏᴛ sᴛᴀᴛᴜꜱ.
 ➲ </code>/users</code>: ᴄʜᴇᴄᴋ ᴀʟʟ ʙᴏᴛ ᴜꜱᴇʀꜱ.
 ➲ </code>/add_token</code>: ᴀᴅᴅ ᴛᴏᴋᴇɴ ᴛᴏ ᴀ ᴜꜱᴇʀ.
-➲ </code>/addfsub</code>: ᴀᴅᴅ ғᴏʀᴄᴇ ꜱᴜʙꜱᴄʀɪᴘᴛɪᴏɴ ᴄʜᴀɴɴᴇʟ.
-➲ </code>/delfsub</code>: ʀᴇᴍᴏᴠᴇ ғᴏʀᴄᴇ ꜱᴜʙᴄʀɪᴘᴛɪᴏɴ ᴄʜᴀɴɴᴇʟ.
-➲ </code>/channels</code>: ᴠɪᴇᴡ ᴀʟʟ ғꜱᴜʙ ᴄʜᴀɴɴᴇʟꜱ.
 ➲ </code>/restart</code>: ʀᴇꜱᴛᴀʀᴛ ᴛʜᴇ ʙᴏᴛ.
 """
 
