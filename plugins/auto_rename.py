@@ -108,16 +108,23 @@ async def auto_rename_command(client, message):
         command_parts = message.text.split(maxsplit=1)
         if len(command_parts) < 2 or not command_parts[1].strip():
             await message.reply_text(
-                "**⚠️ Pʟᴇᴀsᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ʀᴇɴᴀᴍᴇ ᴛᴇᴍᴘʟᴀᴛᴇ.**\n\n"
-                "**🧾 Fᴏʀᴍᴀᴛ:** `<code>/autorename [S{season}E{episode}] {title} [{resolution}] [{audio}]</code>`\n"
-                "**🎬 Iɴᴘᴜᴛ:** `World Trigger S01E03 [1080p] [Dual].mkv`\n"
-                "**📁 Oᴜᴛᴘᴜᴛ:** `[S01E03] World Trigger [1080p] [Dual]`\n\n"
-                 {title} [{resolution}] [{audio}] for movies.
-                "**📌 Nᴏᴛᴇs:**\n"
-                "- Tʜᴇ ʙᴏᴛ ᴡɪʟʟ ᴜsᴇ ᴛʜɪs ᴛᴇᴍᴘʟᴀᴛᴇ ᴛᴏ ʀᴇɴᴀᴍᴇ ʏᴏᴜʀ ғɪʟᴇs ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ.\n"
-                "- Eɴᴀʙʟᴇ ᴡɪᴛʜ `/autorename_on`  •  Dɪsᴀʙʟᴇ ᴡɪᴛʜ `/autorename_off`\n"
-                "- `{title}` ᴇxᴛʀᴀᴄᴛs ᴛʜᴇ ᴍᴀɪɴ ᴛɪᴛʟᴇ, ʀᴇᴍᴏᴠɪɴɢ sᴇᴀsᴏɴ/ᴇᴘɪsᴏᴅᴇ/ǫᴜᴀʟɪᴛʏ/ᴍᴇᴛᴀᴅᴀᴛᴀ."
+                "<b>⚠️ Please provide a rename template.</b>\n\n"
+                "<b>🧾 Format:</b>\n"
+                "<code>/autorename [S{season}E{episode}] {title} [{resolution}] [{audio}]</code>\n\n"
+                "<b>🎬 Input:</b>\n"
+                "<code>World Trigger S01E03 [1080p] [Dual].mkv</code>\n"
+                "<b>📁 Output:</b>\n"
+                "<code>[S01E03] World Trigger [1080p] [Dual].mkv</code>\n\n"
+                "<b>🎬 Input (Movie):</b>\n"
+                "<code>Firefly (2025) HQ HDRip - x264 - [Tam + Tel + Hin + Mal] - (AAC 2.0) - 850MB - ESub.mkv</code>\n"
+                "<b>📁 Output:</b>\n"
+                "<code>Firefly (2025) [HDRip] [Tam + Tel + Hin + Mal] [x264].mkv</code>\n\n"
+                "<b>📌 Notes:</b>\n"
+                • The bot will use this template to rename your files automatically.\n"
+                • Enable with <code>/autorename_on</code> • Disable with <code>/autorename_off</code>\n"
+                • <code>{title}</code> extracts the main title, removing season/episode/quality/metadata."
             )
+
             return
 
         # Save template for user or process further
