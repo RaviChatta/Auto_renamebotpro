@@ -21,7 +21,7 @@ class Config(object):
     FORCE_SUB_CHANNELS = os.environ.get('FORCE_SUB_CHANNELS', ' ').split(', ')
     LOG_CHANNEL = os.environ.get("LOG_CHANNEL", "@emledhurrror")
     DUMP_CHANNEL = os.environ.get("DUMP_CHANNEL", "-1002308381248")
-    DUMP = True
+    DUMP = False
     BOT_CHANNEL_NAME = os.environ.get("BOT_CHANNEL_NAME", "TFIBOTS")
     BOT_CHANNEL_USERNAME = os.environ.get("BOT_CHANNEL_USERNAME", "Autorenamer2bot")
     SUPPORT_CHANNEL_NAME = os.environ.get("SUPPORT_CHANNEL_NAME", "TFIBOTS_SUPPORT ")
@@ -55,7 +55,7 @@ class Config(object):
     RENAMED_DELETE_TIMER = 120
     ADMIN_OR_PREMIUM_TASK_LIMIT = 5
     NORMAL_TASK_LIMIT = 3
-    ADMIN_USAGE_MODE = True
+    ADMIN_USAGE_MODE = False
     GLOBAL_TOKEN_MODE = True
     GLOBAL_TOKEN_EXPIRY = None
     SESSION_NAME = "Renamer"
