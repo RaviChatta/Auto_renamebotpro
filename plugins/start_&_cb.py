@@ -429,9 +429,24 @@ async def cb_handler(client, query: CallbackQuery):
             text=Txt.START_TXT.format(query.from_user.mention),
             disable_web_page_preview=True,
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton('ᴜᴘᴅᴀᴛᴇs', url=f'https://t.me/TFIBOTS'), InlineKeyboardButton('sᴜᴘᴘᴏʀᴛ', url=f'https://t.me/TFIBOTS_SUPPORT')],
-                [InlineKeyboardButton('ᴀʙᴏᴜᴛ', callback_data='about'), InlineKeyboardButton('ᴘʀᴇᴍɪᴜᴍ', callback_data='premiumx')],
-                [InlineKeyboardButton("ᴄᴏᴍᴍᴀɴᴅs", callback_data='help')]
+                 [   # A R I S E row at the top
+                    InlineKeyboardButton(text="ᴀ", callback_data="admin_cmds"),       # A
+                    InlineKeyboardButton(text="ʀ", callback_data="help"),  # R
+                    InlineKeyboardButton(text="ɪ", callback_data="about"),       # I
+                    InlineKeyboardButton(text="ꜱ", callback_data="premiumx"),        # S
+                    InlineKeyboardButton(text="ᴇ", callback_data="settings_menu")  # E
+                ],
+                [
+                    InlineKeyboardButton('ᴜᴘᴅᴀᴛᴇs', url= "https://t.me/TFIBOTS"),
+                    InlineKeyboardButton('sᴜᴘᴘᴏʀᴛ', url= "https://t.me/TFIBOTS_SUPPORT")
+                ],
+                [
+                    InlineKeyboardButton('ᴀʙᴏᴜᴛ', callback_data='about'),
+                    InlineKeyboardButton('ᴘʀᴇᴍɪᴜᴍ', callback_data='premiumx')
+                ],
+                [
+                    InlineKeyboardButton("ᴄᴏᴍᴍᴀɴᴅs", callback_data='help')
+                ]
             ])
         )
     elif data == "caption":
@@ -479,8 +494,8 @@ async def cb_handler(client, query: CallbackQuery):
                   InlineKeyboardButton("ᴄʟᴏsᴇ", callback_data="close"),
                   InlineKeyboardButton("ʙᴀᴄᴋ", callback_data="help")
               ]
-          ]),
-          parse_mode="html"  # ✅ required for <b>, <code>, etc.
+          ])
+          # ✅ required for <b>, <code>, etc.
       )
 
     elif data == "thumbnail":
