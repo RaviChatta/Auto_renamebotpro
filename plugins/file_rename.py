@@ -810,6 +810,21 @@ SEASON_EPISODE_PATTERNS = [
     (re.compile(r'S(\d+)[^\d]+(\d{1,3})\b', re.IGNORECASE), ('season', 'episode')),  # S01.06
     (re.compile(r'\b(?:E|EP|Episode)\s*(\d{1,3})\b', re.IGNORECASE), (None, 'episode')),  # Ep1, Episode 1
     (re.compile(r'\[Ep(\d{1,3})\s*-\s*([^\]]*)\]', re.IGNORECASE), (None, 'episode')),  # [Ep1 - Title]
+        # Standard patterns
+    (re.compile(r'\[S(\d{1,2})[\s\-]*E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),  # [S01-E06]
+    (re.compile(r'S(\d{1,2})[\s\-]*E(\d{1,3})', re.IGNORECASE), ('season', 'episode')),  # S01-E06
+    (re.compile(r'S(\d{1,2})[\._]?E(\d{1,3})', re.IGNORECASE), ('season', 'episode')),  # S01.E06 or S01_E06
+    (re.compile(r'Season[\s\-]*(\d{1,2})[\s\-]*Episode[\s\-]*(\d{1,3})', re.IGNORECASE), ('season', 'episode')),  # Season 1 Episode 1
+    (re.compile(r'(\d{1,2})x(\d{1,3})', re.IGNORECASE), ('season', 'episode')),  # 1x01 format
+    
+    # Anime-specific patterns
+    (re.compile(r'(\d{1,3})[vV]\d{1}', re.IGNORECASE), (None, 'episode')),  # 01v2
+    (re.compile(r'EP?(\d{1,3})', re.IGNORECASE), (None, 'episode')),  # EP01 or E01
+    (re.compile(r'(\d{1,3})[\._]', re.IGNORECASE), (None, 'episode')),  # 01. or 01_
+    
+    # Fallback patterns
+    (re.compile(r'\[(\d{1,3})\]', re.IGNORECASE), (None, 'episode')),  # [01]
+    (re.compile(r'\b(\d{1,3})\b', re.IGNORECASE), (None, 'episode')),  # Standalone numbers
 ]
 
 QUALITY_PATTERNS = [
@@ -822,46 +837,77 @@ QUALITY_PATTERNS = [
     (re.compile(r'\b(4kX264|4kx265)\b', re.IGNORECASE), lambda m: "2160p"),  # 4kX264
     (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1)),  # [1080p]
     (re.compile(r'\b(360p|480p|576p)\b', re.IGNORECASE), lambda m: m.group(1)),  # Low resolutions
+    (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1)),  # [1080p]
+    (re.compile(r'\b(\d{3,4})p\b', re.IGNORECASE), lambda m: f"{m.group(1)}p"),  # 1080p
+    (re.compile(r'\b(4k|2160p|UHD)\b', re.IGNORECASE), lambda m: "2160p"),  # 4K
+    (re.compile(r'\b(2k|1440p|QHD)\b', re.IGNORECASE), lambda m: "1440p"),  # 2K
+    (re.compile(r'\b(1080p|FHD)\b', re.IGNORECASE), lambda m: "1080p"),  # 1080p
+    (re.compile(r'\b(720p|HD)\b', re.IGNORECASE), lambda m: "720p"),  # 720p
+    (re.compile(r'\b(480p|SD)\b', re.IGNORECASE), lambda m: "480p"),  # 480p
+        # Source/encoding patterns
+    (re.compile(r'\b(HDRip|HDTV|WEB-DL|WEBRip|BluRay|BDRip|BRRip|DVDRip|HDR)\b', re.IGNORECASE), lambda m: m.group(1)),
+    (re.compile(r'\b(x264|x265|HEVC|AVC|h264|h265)\b', re.IGNORECASE), lambda m: m.group(1).lower().replace('h264', 'x264').replace('h265', 'x265')),
+    
+    # Audio patterns
+    (re.compile(r'\b(AAC|AC3|DTS|DD\+?5\.1|2\.0)\b', re.IGNORECASE), lambda m: m.group(1)),
 ]
 
 CODEC_PATTERNS = [
     (re.compile(r'\b(x264|x265|HEVC|H264|H265|AVC)\b', re.IGNORECASE), lambda m: m.group(1).lower().replace('h264', 'x264').replace('h265', 'HEVC'))
 ]
+LANGUAGE_PATTERNS = [
+    (re.compile(r'\[(Sub|Dub|Dual Audio)\]', re.IGNORECASE), lambda m: m.group(1)),
+    (re.compile(r'\b(Sub|Dub|Dual)\b', re.IGNORECASE), lambda m: m.group(1)),
+    (re.compile(r'\[(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)\]', re.IGNORECASE), 
+     lambda m: {"Tam": "Tam", "Tamil": "Tam", "Tel": "Tel", "Telugu": "Tel", 
+                "Hin": "Hin", "Hindi": "Hin", "Mal": "Mal", "Malayalam": "Mal",
+                "Kan": "Kan", "Kannada": "Kan", "Eng": "Eng", "English": "Eng",
+                "Jpn": "Jpn", "Japanese": "Jpn"}.get(m.group(1), m.group(1))),
+]
+
 
 def extract_season_episode(filename):
-    """Extract season and episode from filename, return None for movies."""
+    """Enhanced season/episode extraction with better pattern matching"""
     if not filename:
         return None, None
     
-    filename = re.sub(r'\(.*?\)', ' ', filename)  # Remove parentheses
+    # Try all patterns in order
     for pattern, (season_group, episode_group) in SEASON_EPISODE_PATTERNS:
         match = pattern.search(filename)
         if match:
-            season = match.group(1).zfill(2) if season_group and match.group(1) else None
-            episode = match.group(2 if season_group else 1).zfill(2) if episode_group else None
+            season = match.group(1).zfill(2) if season_group else None
+            episode = match.group(2 if season_group else 1).zfill(3) if episode_group else None
             if season or episode:
-                season = season or "01"  # Default season to 01 if only episode is found
-                logger.info(f"Extracted season: {season}, episode: {episode} from {filename}")
                 return season, episode
     
-    logger.debug(f"No season/episode pattern matched for {filename}, treating as movie")
     return None, None
+
     
 def extract_quality(filename):
-    """Extract video quality from filename, prioritizing source-based tags."""
+    """Enhanced quality extraction"""
     if not filename:
         return None
     
+    # Try resolution patterns first
     for pattern, extractor in QUALITY_PATTERNS:
         match = pattern.search(filename)
         if match:
             quality = extractor(match)
-            logger.info(f"Extracted quality: {quality} from {filename}")
             return quality
     
-    logger.debug(f"No quality pattern matched for {filename}")
     return None
 
+def extract_language(filename):
+    """Extract language/sub/dub information"""
+    if not filename:
+        return None
+    
+    for pattern, extractor in LANGUAGE_PATTERNS:
+        match = pattern.search(filename)
+        if match:
+            return extractor(match)
+    
+    return None
 
 async def extract_codec(filename, file_path):
     """Extract codec from filename or ffprobe."""
@@ -1093,59 +1139,61 @@ def get_audio_label(audio_info, filename=None):
     return "Multi" if audio_count > 1 else None
 
 def extract_title(source_text):
-    """Extract the show or movie title, preserving capitalization."""
+    """Improved title extraction with better cleaning"""
     if not source_text:
         return "Unknown"
     
-    text = source_text
-    # Special case for [EpX - Title]
-    ep_title_match = re.search(r'\[Ep(\d{1,3})\s*-\s*([^\]]*)\]', text, re.IGNORECASE)
-    if ep_title_match:
-        text = ep_title_match.group(2)
-    
-    # Remove season/episode patterns
-    for pattern, _ in SEASON_EPISODE_PATTERNS:
-        text = pattern.sub("", text)
-    
-    # Remove quality patterns
-    for pattern, _ in QUALITY_PATTERNS:
-        text = pattern.sub("", text)
-    
-    # Remove codec patterns
-    for pattern, _ in CODEC_PATTERNS:
-        text = pattern.sub("", text)
-    
-    # Remove other common metadata
-    metadata_patterns = [
-        r'\b\d{4}\b(?!\w)',  # Remove years
-        r'\[(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)(\s*\+\s*(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese))*\]',  # Language tags
-        r'\b(aac|ac3|dts|flac|dd\+?5_1|192|2\.0)\b',  # Audio info
-        r'\b(web-dl|webrip|bluray|bdrip|brrip|dvdrip|hdrip|hdtv|true_webdl|hq)\b',  # Source tags
-        r'\b\d{2,4}mb\b',  # Size info
-        r'[-.]Pahe\b',  # Release group
-        r'\.[^\.]*?\.\d{3,4}p.*$',  # Episode names before quality
-        r'[@\-]\w+',  # @username or -group tags
-        r'\[.*?\]',  # Brackets
-        r'\(.*?\)',  # Parentheses last
+    # Remove common metadata patterns
+    patterns_to_remove = [
+        # Season/episode patterns
+        r'\[?S\d{1,2}[\s\-]*E\d{1,3}\]?', r'Season\s*\d{1,2}', r'Episode\s*\d{1,3}',
+        r'\d{1,2}x\d{1,3}', r'EP?\d{1,3}', r'\[\d{1,3}\]',
+        
+        # Quality/resolution patterns
+        r'\[\d{3,4}[pi]\]', r'\d{3,4}p', r'4[kK]', r'2[kK]', 
+        r'HDTV', r'WEB[\- ]?DL', r'WEB[\- ]?Rip', r'Blu[\- ]?Ray',
+        r'x\d{3,4}', r'HDR', r'DTS', r'AAC', r'AC3',
+        
+        # Language patterns
+        r'\[(Sub|Dub|Dual Audio)\]', r'\[(Tam|Tel|Hin|Mal|Kan|Eng|Jpn)\]',
+        
+        # Other common patterns
+        r'\[.*?\]', r'\(.*?\)', r'v\d', r'[\-_]', r'\d+MB', r'\d+GB'
     ]
     
-    for pattern in metadata_patterns:
-        text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+    for pattern in patterns_to_remove:
+        source_text = re.sub(pattern, '', source_text, flags=re.IGNORECASE)
     
-    # Replace underscores and standalone dots with spaces
-    text = re.sub(r'(?<!\w)\.(?!\w)', ' ', text)
-    text = text.replace('_', ' ').strip()
-    text = re.sub(r'\s+', ' ', text)
+    # Clean up remaining special characters and whitespace
+    source_text = re.sub(r'[^\w\s]', ' ', source_text)  # Replace special chars with space
+    source_text = re.sub(r'\s+', ' ', source_text).strip()  # Remove extra spaces
     
-    # Capitalize words, preserving acronyms and special cases
-    words = text.split()
-    title = ' '.join(word if word.isupper() or '.' in word else word.capitalize() for word in words)
+    # Title case formatting
+    words = source_text.split()
+    formatted_words = []
+    for word in words:
+        if word.isupper() or word.islower():
+            formatted_words.append(word.title())
+        else:
+            formatted_words.append(word)
     
-    # Fix common apostrophes
-    title = title.replace("Takopi's", "Takopi’s")
-    
-    return title if title else "Unknown"
+    return ' '.join(formatted_words)
 
+def format_filename(template, replacements):
+    """Apply formatting with proper brackets and spacing"""
+    # First pass - replace all placeholders
+    filename = template.format(**replacements)
+    
+    # Second pass - clean up formatting
+    filename = re.sub(r'\[[\s\-]*\]', '', filename)  # Remove empty brackets
+    filename = re.sub(r'\s+', ' ', filename).strip()  # Remove extra spaces
+    filename = re.sub(r'(?<!\w)\.(?!\w)', '', filename)  # Remove standalone dots
+    
+    # Ensure proper spacing around brackets
+    filename = re.sub(r'(\S)\[', r'\1 [', filename)
+    filename = re.sub(r'\](\S)', r'] \1', filename)
+    
+    return filename
 async def process_thumbnail(thumb_path):
     if not thumb_path or not await aiofiles.os.path.exists(thumb_path):
         return None
@@ -1427,6 +1475,7 @@ async def auto_rename_files(client, message: Message):
             chapter = extract_chapter(source_text)
             volume = extract_volume(source_text)
             quality = extract_quality(source_text)
+            language = extract_language(file_name)
             title = extract_title(source_text)
             codec = await extract_codec(source_text, None)  # Extract codec from filename first
             year = extract_year(source_text)  # Extract year from source text
