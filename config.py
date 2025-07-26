@@ -87,12 +87,12 @@ class Txt(object):
 ➲ <code>{chapter}</code> – Chapter (if any)
 
 <b>Formats:</b>  
-➲ <b>TV Series:</b> <code> /autorename [{season} - {episode}] {title} [{quality}] [{audio}] </code>  
-➲ <b>Movies:</b> <code> /autorename {title} ({year}) [{audio}] [{quality}] [{codec}] </code>
+➲ <b>TV Series:</b> <code> /arise [{season} - {episode}] {title} [{quality}] [{audio}] </code>  
+➲ <b>Movies:</b> <code> /arise {title} ({year}) [{audio}] [{quality}] [{codec}] </code>
 
 <b>Auto-Rename Toggle:</b>  
-➲ <code>/autorename_on</code> – Enable auto-renaming  
-➲ <code>/autorename_off</code> – Disable auto-renaming
+➲ <code>/arise_on</code> – Enable auto-renaming  
+➲ <code>/arise_off</code> – Disable auto-renaming
 
 <b>Usage:</b>  
 Use the above variables in your rename format with the <code>/autorename</code> command.  
