@@ -865,15 +865,32 @@ LANGUAGE_PATTERNS = [
                 "Jpn": "Jpn", "Japanese": "Jpn"}.get(m.group(1), m.group(1))),
 ]
 
+def sanitize_filename(filename):
+    """Sanitize the filename to remove invalid characters"""
+    if not filename:
+        return "Unknown"
+    
+    # Remove invalid characters
+    filename = re.sub(r'[<>:"/\\|?*\x00-\x1F]', '', filename)
+    filename = filename.strip()
+    
+    # Replace multiple spaces with single space
+    filename = re.sub(r'\s+', ' ', filename)
+    
+    # Truncate if too long (max 255 chars which is filesystem limit)
+    if len(filename) > 255:
+        filename = filename[:255]
+    
+    return filename
 
 def extract_season_episode(filename):
     """Enhanced season/episode extraction with better pattern matching"""
     if not filename:
         return None, None
-    
+    filename = filename.lower()
     # Try all patterns in order
     for pattern, (season_group, episode_group) in SEASON_EPISODE_PATTERNS:
-        match = pattern.search(filename)
+        match = re.search(pattern, filename)
         if match:
             season = match.group(1).zfill(2) if season_group else None
             episode = match.group(2 if season_group else 1).zfill(3) if episode_group else None
@@ -887,13 +904,13 @@ def extract_quality(filename):
     """Enhanced quality extraction"""
     if not filename:
         return None
-    
+    filename = filename.lower()
+
     # Try resolution patterns first
     for pattern, extractor in QUALITY_PATTERNS:
-        match = pattern.search(filename)
-        if match:
-            quality = extractor(match)
-            return quality
+        for alias in aliases:
+            if alias in filename:
+                return quality
     
     return None
 
@@ -901,7 +918,8 @@ def extract_language(filename):
     """Extract language/sub/dub information"""
     if not filename:
         return None
-    
+    filename = filename.lower()
+
     for pattern, extractor in LANGUAGE_PATTERNS:
         match = pattern.search(filename)
         if match:
@@ -1138,46 +1156,33 @@ def get_audio_label(audio_info, filename=None):
 
     return "Multi" if audio_count > 1 else None
 
-def extract_title(source_text):
-    """Improved title extraction with better cleaning"""
-    if not source_text:
+def extract_title(filename):
+    """Extract clean title from filename"""
+    if not filename:
         return "Unknown"
     
-    # Remove common metadata patterns
+    # Remove common patterns
     patterns_to_remove = [
-        # Season/episode patterns
-        r'\[?S\d{1,2}[\s\-]*E\d{1,3}\]?', r'Season\s*\d{1,2}', r'Episode\s*\d{1,3}',
-        r'\d{1,2}x\d{1,3}', r'EP?\d{1,3}', r'\[\d{1,3}\]',
-        
-        # Quality/resolution patterns
-        r'\[\d{3,4}[pi]\]', r'\d{3,4}p', r'4[kK]', r'2[kK]', 
-        r'HDTV', r'WEB[\- ]?DL', r'WEB[\- ]?Rip', r'Blu[\- ]?Ray',
-        r'x\d{3,4}', r'HDR', r'DTS', r'AAC', r'AC3',
-        
-        # Language patterns
-        r'\[(Sub|Dub|Dual Audio)\]', r'\[(Tam|Tel|Hin|Mal|Kan|Eng|Jpn)\]',
-        
-        # Other common patterns
-        r'\[.*?\]', r'\(.*?\)', r'v\d', r'[\-_]', r'\d+MB', r'\d+GB'
+        r'\[.*?\]', r'\(.*?\)',  # Remove anything in brackets
+        r's\d{1,2}e\d{1,3}',  # Remove S01E01 patterns
+        r'\d{3,4}p',  # Remove quality indicators
+        r'x\d{3,4}', r'h\.?264', r'h\.?265',  # Remove codec info
+        r'bluray', r'web-dl', r'webrip', r'hdtv',  # Remove source info
+        r'\.mkv$', r'\.mp4$', r'\.avi$'  # Remove extensions
     ]
     
     for pattern in patterns_to_remove:
-        source_text = re.sub(pattern, '', source_text, flags=re.IGNORECASE)
+        filename = re.sub(pattern, '', filename, flags=re.IGNORECASE)
     
-    # Clean up remaining special characters and whitespace
-    source_text = re.sub(r'[^\w\s]', ' ', source_text)  # Replace special chars with space
-    source_text = re.sub(r'\s+', ' ', source_text).strip()  # Remove extra spaces
+    # Clean up remaining special characters
+    filename = re.sub(r'[^\w\s]', ' ', filename)
+    filename = re.sub(r'\s+', ' ', filename).strip()
     
-    # Title case formatting
-    words = source_text.split()
-    formatted_words = []
-    for word in words:
-        if word.isupper() or word.islower():
-            formatted_words.append(word.title())
-        else:
-            formatted_words.append(word)
+    # Title case
+    filename = filename.title()
     
-    return ' '.join(formatted_words)
+    return filename if filename else "Unknown"
+
 
 def format_filename(template, replacements):
     """Apply formatting with proper brackets and spacing"""
