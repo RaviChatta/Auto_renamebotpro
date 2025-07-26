@@ -113,10 +113,10 @@ async def auto_rename_command(client, message):
                 "<b>⚠️ Please provide a rename template.</b>\n\n"
         
                 "<b>🧾 Format (Series):</b>\n"
-                "<code>/autorename [S{season} - E{episode}] {title} [{resolution}] [{audio}]</code>\n"
+                "<code>/autorename [{season} - {episode}] {title} [{quality}] [{audio}]</code>\n"
                 
                 "<b>🧾 Format (Movies):</b>\n"
-                "<code>/autorename {title} ({year}) [{resolution}] [{audio}] [{codec}]</code>\n\n"
+                "<code>/autorename {title} ({year}) [{audio}] [{quality}] [{codec}]</code>\n\n"
         
                 "<b>📺 Series Input:</b>\n"
                 "<code>World Trigger S01E03 [1080p] [Dual].mkv</code>\n"
