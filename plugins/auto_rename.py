@@ -99,7 +99,7 @@ async def handle_history_pagination(client, callback_query: CallbackQuery):
     await send_history_page(client, callback_query.message, history, current_page, total_pages, items_per_page, target_user_id, edit=True)
     await callback_query.answer()
 
-@Client.on_message(filters.private & filters.command("autorename"))
+@Client.on_message(filters.private & filters.command("arise"))
 @check_ban_status
 async def auto_rename_command(client, message):
     try:
@@ -113,10 +113,10 @@ async def auto_rename_command(client, message):
                 "<b>⚠️ Please provide a rename template.</b>\n\n"
         
                 "<b>🧾 Format (Series):</b>\n"
-                "<code>/autorename [{season} - {episode}] {title} [{quality}] [{audio}]</code>\n"
+                "<code>/arise [{season} - {episode}] {title} [{quality}] [{audio}]</code>\n"
                 
                 "<b>🧾 Format (Movies):</b>\n"
-                "<code>/autorename {title} ({year}) [{audio}] [{quality}] [{codec}]</code>\n\n"
+                "<code>/arise {title} ({year}) [{audio}] [{quality}] [{codec}]</code>\n\n"
         
                 "<b>📺 Series Input:</b>\n"
                 "<code>World Trigger S01E03 [1080p] [Dual].mkv</code>\n"
@@ -130,7 +130,7 @@ async def auto_rename_command(client, message):
         
                 "<b>📌 Notes:</b>\n"
                 "<b>•</b> The bot will use this template to rename your files automatically.\n"
-                "<b>•</b> Enable with <code>/autorename_on</code>  •  Disable with <code>/autorename_off</code>\n"
+                "<b>•</b> Enable with <code>/arise_on</code>  •  Disable with <code>/arise_off</code>\n"
                 "<b>•</b> <code>{title}</code> extracts the main title, removing season/episode/quality/metadata.\n"
                 "<b>•</b> Use <code>{year}</code>, <code>{codec}</code> etc. to customize further.",
                
@@ -224,14 +224,14 @@ async def handle_rename_source_selection(client, callback_query: CallbackQuery):
         f"**Rᴇɴᴀᴍᴇ sᴏᴜʀᴄᴇ sᴇᴛ ᴛᴏ:** `{source}`\n"
         f"Nᴏᴡ ᴛʜᴇ ʙᴏᴛ ᴡɪʟʟ ᴜsᴇ ᴛʜᴇ {source} ғᴏʀ ᴇxᴛʀᴀᴄᴛɪɴɢ ᴠᴀʀɪᴀʙʟᴇs ᴡʜᴇɴ ʀᴇɴᴀᴍɪɴɢ."
     )
-@Client.on_message(filters.command(["autorename_on"]) & filters.private)
+@Client.on_message(filters.command(["arise_on"]) & filters.private)
 @check_ban_status
 async def autorename_on(client, message):
     user_id = message.from_user.id
     await DARKXSIDE78.set_autorename_status(user_id, True)
     await message.reply_text("✅ **Auto-Rename Mode has been enabled!**\nAll your uploads will be renamed automatically.")
 
-@Client.on_message(filters.command(["autorename_off"]) & filters.private)
+@Client.on_message(filters.command(["arise_off"]) & filters.private)
 @check_ban_status
 async def autorename_off(client, message):
     user_id = message.from_user.id
