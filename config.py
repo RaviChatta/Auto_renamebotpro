@@ -18,7 +18,7 @@ class Config(object):
     FORCE_PIC   = os.environ.get("FORCE_PIC", "https://files.catbox.moe/3mtgb2.jpg")
     ADMINS       = [int(admins) if id_pattern.search(admins) else admins for admins in os.environ.get('ADMINS', '1047253913').split()]
     ADMIN       = [int(admin) if id_pattern.search(admin) else admin for admin in os.environ.get('ADMIN', '1047253913').split()]
-    FORCE_SUB_CHANNELS = os.environ.get('FORCE_SUB_CHANNELS', ' ').split(', ')
+    FORCE_SUB_CHANNELS = os.environ.get('FORCE_SUB_CHANNELS', ' -1002768753641 , ').split(', ')
     SHOW_CHANNEL = os.environ.get("SHOW_CHANNEL", "@emledhurrror")
     LOG_CHANNEL = os.environ.get("LOG_CHANNEL", "@emledhurrror")
     DUMP_CHANNEL = os.environ.get("DUMP_CHANNEL", "-1002308381248")
