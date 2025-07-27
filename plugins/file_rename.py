@@ -973,7 +973,173 @@ async def extract_codec(filename, file_path):
         except Exception as e:
             logger.error(f"Codec detection error: {e}")
             return None
+async def detect_audio_info(file_path):
+    """Detect audio and subtitle information using ffprobe."""
+    ffprobe = shutil.which('ffprobe')
+    if not ffprobe:
+        logger.warning("ffprobe not found, skipping audio detection")
+        return 0, 0, [], 0
 
+    cmd = [
+        ffprobe,
+        '-v', 'quiet',
+        '-print_format', 'json',
+        '-show_streams',
+        file_path
+    ]
+
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await process.communicate()
+
+    try:
+        info = json.loads(stdout)
+        streams = info.get('streams', [])
+        audio_streams = [s for s in streams if s.get('codec_type') == 'audio']
+        sub_streams = [s for s in streams if s.get('codec_type') == 'subtitle']
+
+        audio_languages = []
+        for audio in audio_streams:
+            lang = audio.get('tags', {}).get('language', '').lower()
+            if lang in {'ja', 'jpn', 'japanese'}:
+                audio_languages.append('Jpn')
+            elif lang in {'en', 'eng', 'english'}:
+                audio_languages.append('Eng')
+            elif lang in {'ta', 'tam', 'tamil'}:
+                audio_languages.append('Tam')
+            elif lang in {'te', 'tel', 'telugu'}:
+                audio_languages.append('Tel')
+            elif lang in {'hi', 'hin', 'hindi'}:
+                audio_languages.append('Hin')
+            elif lang in {'ml', 'mal', 'malayalam'}:
+                audio_languages.append('Mal')
+            elif lang in {'kn', 'kan', 'kannada'}:
+                audio_languages.append('Kan')
+            else:
+                audio_languages.append('Unknown')
+
+        english_subs = sum(1 for sub in sub_streams if sub.get('tags', {}).get('language', '').lower() in {'en', 'eng', 'english'})
+
+        return len(audio_streams), len(sub_streams), audio_languages, english_subs
+    except Exception as e:
+        logger.error(f"Audio detection error: {e}")
+        return 0, 0, [], 0
+
+async def detect_video_resolution(file_path):
+    """Detect actual video resolution using ffprobe."""
+    ffprobe = shutil.which('ffprobe')
+    if not ffprobe:
+        logger.warning("ffprobe not found, skipping resolution detection")
+        return None
+
+    cmd = [
+        ffprobe,
+        '-v', 'quiet',
+        '-print_format', 'json',
+        '-show_streams',
+        '-select_streams', 'v',
+        file_path
+    ]
+
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await process.communicate()
+
+    try:
+        info = json.loads(stdout)
+        streams = info.get('streams', [])
+        if not streams:
+            return None
+        video_stream = streams[0]
+        width = video_stream.get('width', 0)
+        height = video_stream.get('height', 0)
+        
+        if height >= 2160 or width >= 3840:
+            return "2160p"
+        elif height >= 1440:
+            return "1440p"
+        elif height >= 1080:
+            return "1080p"
+        elif height >= 720:
+            return "720p"
+        elif height >= 480:
+            return "480p"
+        elif height >= 360:
+            return "360p"
+        elif height >= 240:
+            return "240p"
+        elif height >= 144:
+            return "144p"
+        else:
+            return f"{height}p"
+            
+    except Exception as e:
+        logger.error(f"Resolution detection error: {e}")
+        return None
+
+def get_audio_label(audio_info, filename=None):
+    """Generate audio label based on audio and subtitle info or filename."""
+    if not audio_info:
+        return None
+        
+    audio_count, sub_count, audio_languages, english_subs = audio_info
+    LANG_MAP = {
+        'tam': 'Tam', 'tamil': 'Tam',
+        'tel': 'Tel', 'telugu': 'Tel',
+        'hin': 'Hin', 'hindi': 'Hin',
+        'mal': 'Mal', 'malayalam': 'Mal',
+        'kan': 'Kan', 'kannada': 'Kan',
+        'eng': 'Eng', 'english': 'Eng',
+        'jpn': 'Jpn', 'japanese': 'Jpn'
+    }
+
+    # Check filename for explicit language group if provided
+    if filename:
+        lang_match = re.search(
+            r'\[((?:\s*(?:Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)\s*\+?)+)\]',
+            filename, re.IGNORECASE
+        )
+        if lang_match:
+            raw_langs = re.findall(
+                r'(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)',
+                lang_match.group(0), re.IGNORECASE
+            )
+            normalized = [LANG_MAP.get(lang.lower(), lang) for lang in raw_langs]
+            return f"[{' + '.join(sorted(set(normalized))}]"
+
+        # If no audio streams, fallback to filename single match
+        if audio_count == 0:
+            lang_match = re.search(
+                r'\b(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)\b',
+                filename, re.IGNORECASE
+            )
+            if lang_match:
+                lang = lang_match.group(1).lower()
+                return LANG_MAP.get(lang, lang)
+
+    # Multiple audio tracks
+    if audio_count > 1 and audio_languages:
+        unique_languages = sorted(set(lang for lang in audio_languages if lang != 'Unknown'))
+        if unique_languages:
+            return f"[{' + '.join(unique_languages)}]"
+        return "Multi"
+
+    # Single audio
+    if audio_count == 1:
+        lang = audio_languages[0] if audio_languages else 'Unknown'
+        if lang == 'Jpn' and english_subs >= 1:
+            return "Sub"
+        if lang == 'Eng':
+            return "Dub"
+        return lang if lang != 'Unknown' else None
+
+    return "Multi" if audio_count > 1 else None
 def extract_year(filename):
     """Extract year from filename."""
     match = re.search(r'\b(19\d{2}|20\d{2})\b(?!\w)', filename)
