@@ -362,7 +362,7 @@ USAGE:
 ➲ </code>/rename_history</code>: ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ʀᴇɴᴀᴍɪɴɢ ʜɪsᴛᴏʀʏ.
 ➲ </code>/setmedia</code>: ᴛᴏ sᴇᴛ ᴍᴇᴅɪᴀ ᴛʏᴘᴇ ɪɴ ʏᴏᴜʀ ʙᴏᴛ.
 ➲ </code>/set_caption</code>: ᴛᴏ ꜱᴇᴛ ᴀ ᴄᴜꜱᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ.
-➲ </code>\set_source</code>: ᴛᴏ ꜱᴇᴛ ᴀ ʀᴇɴᴀᴍᴇ ꜱᴏᴜʀᴄᴇ
+➲ </code>/set_source</code>: ᴛᴏ ꜱᴇᴛ ᴀ ʀᴇɴᴀᴍᴇ ꜱᴏᴜʀᴄᴇ
 ➲ </code>/view_caption</code>: ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴄᴀᴘᴛɪᴏɴ.
 ➲ </code>/del_caption</code>: ᴛᴏ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴄᴀᴘᴛɪᴏɴ.
 ➲ </code>/setthumb</code>: ᴛᴏ sᴇᴛ ᴄᴜꜱᴛᴏᴍ ᴛʜᴜᴍʙɴᴀɪʟ.
