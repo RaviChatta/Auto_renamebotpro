@@ -1111,7 +1111,7 @@ def get_audio_label(audio_info, filename=None):
                 lang_match.group(0), re.IGNORECASE
             )
             normalized = [LANG_MAP.get(lang.lower(), lang) for lang in raw_langs]
-            return f"[{' + '.join(sorted(set(normalized))}]"
+            return f"[{' + '.join(sorted(set(normalized)))}]"
 
         # If no audio streams, fallback to filename single match
         if audio_count == 0:
