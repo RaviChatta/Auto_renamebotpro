@@ -57,7 +57,7 @@ def check_ban_status(func):
         is_banned, ban_reason = await DARKXSIDE78.is_user_banned(user_id)
         if is_banned:
             await message.reply_text(
-                f"**Yᴏᴜ ᴀʀᴇ ʙᴀɴɴᴇᴅ ғʀᴏᴍ ᴜsɪɴɢ ᴛʜɪs ʙᴏᴛ.**\n\n**Rᴇᴀsᴏɴ:** {ban_reason}"
+                f"**You are banned from using this bot.**\n\n**Reason:** {ban_reason}"
             )
             return
         return await func(client, message, *args, **kwargs)
