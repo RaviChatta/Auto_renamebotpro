@@ -1402,7 +1402,7 @@ async def auto_rename_files(client, message: Message):
         return await message.reply_text("Aᴅᴍɪɴ ᴍᴏᴅᴇ ɪs ᴀᴄᴛɪᴠᴇ - Oɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜɪs ʙᴏᴛ!")
     autorename_enabled = await DARKXSIDE78.get_autorename_status(user_id)
     if not autorename_enabled:
-        return await message.reply_text("🔕 **Auto-Rename is turned OFF.**\nUse /autorename_on to enable it.")
+        return await message.reply_text("🔕 **Auto-Rename is turned OFF.**\nUse /arise_on to enable it.")
 
     if message.document:
         file_id = message.document.file_id
