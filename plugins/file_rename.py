@@ -848,7 +848,7 @@ QUALITY_PATTERNS = [
     (re.compile(r'\b(AAC|AC3|DTS|DD\+?5\.1|2\.0)\b', re.IGNORECASE), lambda m: m.group(1)),
     
     # Additional comprehensive patterns
-    (re.compile(r'\[(\d{3,4}[pi]\]', re.IGNORECASE), lambda m: m.group(1)),  # [1080p]
+    (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1)),  # [1080p]
     (re.compile(r'\b(\d{3,4})p\b', re.IGNORECASE), lambda m: f"{m.group(1)}p"),  # 1080p
     (re.compile(r'\b(4k|2160p|4k_SDR)\b', re.IGNORECASE), lambda m: "2160p"),  # 4K
     (re.compile(r'\b(2k|1440p)\b', re.IGNORECASE), lambda m: "1440p"),  # 2K
