@@ -458,7 +458,7 @@ async def add_admin(client, message):
 
 class TaskQueue:
     def __init__(self):
-        self.queues: Dict[int, Deque[Tuple[str, Message, asyncio.coroutine]] = {}
+        self.queues: Dict[int, Deque[Tuple[str, Message, asyncio.coroutine]]] = {}
         self.processing: Dict[int, Set[str]] = {}
         self.tasks: Dict[str, asyncio.Task] = {}
         self.max_retries = 3
