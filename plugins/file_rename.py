@@ -1459,7 +1459,10 @@ async def auto_rename_files(client, message: Message):
         file_ext = None
     else:
         return await message.reply_text("Unsupported file type")
-
+        # Ensure title is set in database
+    current_title = await DARKXSIDE78.get_title(user_id)
+    if not current_title:
+        await DARKXSIDE78.set_title(user_id, "Untitled")
     if user_id in active_sequences:
         file_info = {"file_id": file_id, "file_name": file_name if file_name else "Unknown"}
         active_sequences[user_id].append(file_info)
