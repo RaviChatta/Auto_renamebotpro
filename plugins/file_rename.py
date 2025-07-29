@@ -1657,7 +1657,7 @@ async def auto_rename_files(client, message: Message):
                     '{year}': year or '',
                 }
     
-                 new_filename = format_filename(format_template, replacements)
+                new_filename = format_filename(format_template, replacements)
                 if not new_filename:
                     new_filename = "Renamed_File"
                 new_download = os.path.join("downloads", new_filename)
