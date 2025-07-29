@@ -1315,18 +1315,20 @@ async def add_metadata(input_path, output_path, user_id):
     output_dir = os.path.dirname(output_path)
     await aiofiles.os.makedirs(output_dir, exist_ok=True)
 
-    metadata = {
-        'title': await DARKXSIDE78.get_title(user_id),
-        'video': await DARKXSIDE78.get_video(user_id),
-        'audio': await DARKXSIDE78.get_audio(user_id),
-        'subtitle': await DARKXSIDE78.get_subtitle(user_id),
-        'artist': await DARKXSIDE78.get_artist(user_id),
-        'author': await DARKXSIDE78.get_author(user_id),
-        'encoded_by': await DARKXSIDE78.get_encoded_by(user_id),
-        'custom_tag': await DARKXSIDE78.get_custom_tag(user_id),
-        'commentz': await DARKXSIDE78.get_commentz(user_id)
+    # Get all metadata fields with proper fallbacks
+    metadata_fields = {
+        'title': await DARKXSIDE78.get_title(user_id) or "Untitled",
+        'video': await DARKXSIDE78.get_video(user_id) or "",
+        'audio': await DARKXSIDE78.get_audio(user_id) or "",
+        'subtitle': await DARKXSIDE78.get_subtitle(user_id) or "",
+        'artist': await DARKXSIDE78.get_artist(user_id) or "",
+        'author': await DARKXSIDE78.get_author(user_id) or "",
+        'encoded_by': await DARKXSIDE78.get_encoded_by(user_id) or "",
+        'custom_tag': await DARKXSIDE78.get_custom_tag(user_id) or "",
+        'commentz': await DARKXSIDE78.get_commentz(user_id) or ""
     }
 
+    # First try with all metadata
     try:
         cmd = [
             ffmpeg,
@@ -1334,15 +1336,15 @@ async def add_metadata(input_path, output_path, user_id):
             '-i', input_path,
             '-map', '0',
             '-c', 'copy',
-            '-metadata', f'title={metadata["title"]}',
-            '-metadata:s:v', f'title={metadata["video"]}',
-            '-metadata:s:s', f'title={metadata["subtitle"]}',
-            '-metadata:s:a', f'title={metadata["audio"]}',
-            '-metadata', f'artist={metadata["artist"]}',
-            '-metadata', f'author={metadata["author"]}',
-            '-metadata', f'encoded_by={metadata["encoded_by"]}',
-            '-metadata', f'comment={metadata["commentz"]}',
-            '-metadata', f'custom_tag={metadata["custom_tag"]}',
+            '-metadata', f'title={metadata_fields["title"]}',
+            '-metadata:s:v', f'title={metadata_fields["video"]}',
+            '-metadata:s:s', f'title={metadata_fields["subtitle"]}',
+            '-metadata:s:a', f'title={metadata_fields["audio"]}',
+            '-metadata', f'artist={metadata_fields["artist"]}',
+            '-metadata', f'author={metadata_fields["author"]}',
+            '-metadata', f'encoded_by={metadata_fields["encoded_by"]}',
+            '-metadata', f'comment={metadata_fields["commentz"]}',
+            '-metadata', f'custom_tag={metadata_fields["custom_tag"]}',
             '-loglevel', 'error',
             '-y',
             output_path
@@ -1361,6 +1363,7 @@ async def add_metadata(input_path, output_path, user_id):
     except Exception as e:
         logger.warning(f"Full metadata addition failed, trying with basic metadata: {e}")
 
+    # Fallback to just title if full metadata fails
     try:
         cmd = [
             ffmpeg,
@@ -1368,7 +1371,7 @@ async def add_metadata(input_path, output_path, user_id):
             '-i', input_path,
             '-map', '0',
             '-c', 'copy',
-            '-metadata', f'title={metadata["title"]}',
+            '-metadata', f'title={metadata_fields["title"]}',
             '-loglevel', 'error',
             '-y',
             output_path
@@ -1396,7 +1399,6 @@ async def add_metadata(input_path, output_path, user_id):
         logger.error(f"Metadata processing failed: {e}")
         await cleanup_files(output_path)
         raise
-
 async def convert_to_mkv(input_path, output_path):
     """Convert video file to MKV format"""
     ffmpeg = shutil.which('ffmpeg')
