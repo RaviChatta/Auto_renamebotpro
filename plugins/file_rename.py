@@ -1275,17 +1275,85 @@ def extract_title(source_text):
             formatted_words.append(word)
     
     return ' '.join(formatted_words)
+def get_replacements(source_text, file_path=None):
+    """Generate all possible replacements with fallbacks"""
+    season, episode = extract_season_episode(source_text)
+    chapter = extract_chapter(source_text)
+    volume = extract_volume(source_text)
+    quality = extract_quality(source_text)
+    language = extract_language(source_text)
+    title = extract_title(source_text)
+    codec = extract_codec(source_text, file_path)
+    year = extract_year(source_text)
+    
+    # Get actual resolution if available
+    actual_resolution = None
+    if file_path and any(x in source_text.lower() for x in ['video', 'mp4', 'mkv', 'mov']):
+        actual_resolution = detect_video_resolution(file_path)
+    
+    # Get audio info if available
+    audio_info = None
+    if file_path:
+        audio_info = detect_audio_info(file_path)
+    audio_label = get_audio_label(audio_info, source_text) if audio_info else None
 
+    return {
+        # Standard placeholders
+        '{title}': title or 'Unknown',
+        '{season}': season or 'XX',
+        '{episode}': episode or 'XX',
+        '{chapter}': chapter or 'XX',
+        '{volume}': volume or 'XX',
+        '{quality}': quality or '',
+        '{audio}': audio_label or '',
+        '{codec}': codec or '',
+        '{year}': year or '',
+        '{resolution}': actual_resolution or quality or '',
+        
+        # Uppercase variants
+        '{TITLE}': (title or 'Unknown').upper(),
+        '{SEASON}': (season or 'XX').upper(),
+        '{EPISODE}': (episode or 'XX').upper(),
+        '{CHAPTER}': (chapter or 'XX').upper(),
+        '{VOLUME}': (volume or 'XX').upper(),
+        '{QUALITY}': (quality or '').upper(),
+        '{AUDIO}': (audio_label or '').upper(),
+        '{CODEC}': (codec or '').upper(),
+        '{YEAR}': (year or '').upper(),
+        '{RESOLUTION}': (actual_resolution or quality or '').upper(),
+        
+        # Titlecase variants
+        '{Title}': (title or 'Unknown').title(),
+        '{Season}': (season or 'XX').title(),
+        '{Episode}': (episode or 'XX').title(),
+        '{Chapter}': (chapter or 'XX').title(),
+        '{Volume}': (volume or 'XX').title(),
+        '{Quality}': (quality or '').title(),
+        '{Audio}': (audio_label or '').title(),
+        '{Codec}': (codec or '').title(),
+        '{Year}': (year or '').title(),
+        '{Resolution}': (actual_resolution or quality or '').title(),
+    }
 def format_filename(template, replacements):
-    """Apply formatting with proper brackets and spacing"""
-    filename = template.format(**replacements)
-    filename = re.sub(r'\[[\s\-]*\]', '', filename)
-    filename = re.sub(r'\s+', ' ', filename).strip()
-    filename = re.sub(r'(?<!\w)\.(?!\w)', '', filename)
-    filename = re.sub(r'(\S)\[', r'\1 [', filename)
-    filename = re.sub(r'\](\S)', r'] \1', filename)
-    return filename
-
+    """Safely format filename with all possible placeholders"""
+    try:
+        # First pass with all standard replacements
+        filename = template
+        
+        # Replace all known placeholders
+        for placeholder, value in replacements.items():
+            filename = filename.replace(placeholder, str(value))
+            
+        # Clean up any remaining invalid characters
+        filename = re.sub(r'[<>:"/\\|?*]', '', filename)  # Remove invalid filename chars
+        filename = re.sub(r'\s+', ' ', filename).strip()  # Normalize spaces
+        filename = re.sub(r'\[\s*\]', '', filename)  # Remove empty brackets
+        filename = re.sub(r'\(\s*\)', '', filename)  # Remove empty parentheses
+        
+        return filename
+    except Exception as e:
+        logger.error(f"Filename formatting failed: {e}")
+        return "Renamed_File"  # Fallback name
 async def process_thumbnail(thumb_path):
     if not thumb_path or not await aiofiles.os.path.exists(thumb_path):
         return None
@@ -1508,7 +1576,8 @@ async def auto_rename_files(client, message: Message):
                     {"_id": user_id},
                     {"$inc": {"token": -1}}
                 )
-            
+            replacements = get_replacements(source_text, file_path)
+
             format_template = await DARKXSIDE78.get_format_template(user_id)
             media_preference = await DARKXSIDE78.get_media_preference(user_id)
             metadata_source = await DARKXSIDE78.get_metadata_source(user_id)
@@ -1588,11 +1657,14 @@ async def auto_rename_files(client, message: Message):
                     '{year}': year or '',
                 }
     
-                new_filename = f"{format_template.format(**replacements)}{ext}"
+                 new_filename = format_filename(format_template, replacements)
+                if not new_filename:
+                    new_filename = "Renamed_File"
                 new_download = os.path.join("downloads", new_filename)
                 new_metadata = os.path.join("metadata", new_filename)
                 new_output = os.path.join("processed", new_filename)
-    
+                ext = determine_extension(media_type, media_preference, file_ext)
+                new_filename += ext
                 await aiofiles.os.rename(download_path, new_download)
                 download_path = new_download
                 metadata_path = new_metadata
@@ -1837,7 +1909,15 @@ async def auto_rename_files(client, message: Message):
     )
     
     await task_queue.add_task(user_id, file_id, message, process_file())
-
+def determine_extension(media_type, media_preference, original_ext):
+    """Determine the appropriate file extension"""
+    if media_type == "video":
+        return ".mkv" if media_preference == "document" else ".mp4"
+    elif media_type == "document" and original_ext:
+        return original_ext.lower()
+    elif media_type == "audio":
+        return ".mp3"
+    return ".mp4"  # Default fallback
 @Client.on_message(filters.command("renamed") & (filters.group | filters.private))
 @check_ban_status
 async def renamed_stats(client, message: Message):
