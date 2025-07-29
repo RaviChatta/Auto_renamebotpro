@@ -98,6 +98,7 @@ def parse_duration(arg):
         return int(arg)
     return None
 
+
 @Client.on_message(filters.command("pdf_replace") & filters.reply)
 @check_ban_status
 async def pdf_replace_banner(client, message: Message):
@@ -457,7 +458,7 @@ async def add_admin(client, message):
 
 class TaskQueue:
     def __init__(self):
-        self.queues: Dict[int, Deque[Tuple[str, Message, asyncio.coroutine]]] = {}
+        self.queues: Dict[int, Deque[Tuple[str, Message, asyncio.coroutine]] = {}
         self.processing: Dict[int, Set[str]] = {}
         self.tasks: Dict[str, asyncio.Task] = {}
         self.max_retries = 3
@@ -466,7 +467,7 @@ class TaskQueue:
 
     async def add_task(self, user_id: int, file_id: str, message: Message, coro):
         if ADMIN_MODE and user_id not in ADMINS:
-            await message.reply_text("Aᴅᴍɪɴ ᴍᴏᴅᴇ ᴀᴄᴛɪᴠᴇ - Oɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ǫᴜᴇᴜᴇ ғɪʟᴇs!")
+            await message.reply_text("Admin mode active - Only admins can queue files!")
             return
 
         async with self.locks.setdefault(user_id, asyncio.Lock()):
@@ -525,9 +526,9 @@ class TaskQueue:
     async def _handle_failure(self, message: Message, file_id: str, error: Exception):
         try:
             await message.reply_text(
-                f"➠ Fᴀɪʟᴇᴅ ᴛᴏ ᴘʀᴏᴄᴇss ғɪʟᴇ ᴀғᴛᴇʀ {self.max_retries} ᴀᴛᴛᴇᴍᴘᴛs\n"
-                f"➠ Fɪʟᴇ ID: {file_id}\n"
-                f"➠ Eʀʀᴏʀ: {str(error)}"
+                f"➠ Failed to process file after {self.max_retries} attempts\n"
+                f"➠ File ID: {file_id}\n"
+                f"➠ Error: {str(error)}"
             )
         except Exception as e:
             logger.error(f"Failed to send error message: {e}")
@@ -558,6 +559,7 @@ class TaskQueue:
             return canceled
 
 task_queue = TaskQueue()
+
 
 @Client.on_message((filters.group | filters.private) & filters.command("queue"))
 @check_ban_status
@@ -794,99 +796,146 @@ async def check_premium_mode():
             {"$set": {"status": PREMIUM_MODE, "expiry": PREMIUM_MODE_EXPIRY}}
         )
 
-
 SEASON_EPISODE_PATTERNS = [
-    # Standard patterns
-    (re.compile(r'\[S(\d{1,2})[\s\-]*E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),  # [S01-E06]
-    (re.compile(r'S(\d{1,2})[\s\-]*E(\d{1,3})', re.IGNORECASE), ('season', 'episode')),  # S01-E06
-    (re.compile(r'S(\d{1,2})[\._]?E(\d{1,3})', re.IGNORECASE), ('season', 'episode')),  # S01.E06 or S01_E06
-    (re.compile(r'Season[\s\-]*(\d{1,2})[\s\-]*Episode[\s\-]*(\d{1,3})', re.IGNORECASE), ('season', 'episode')),  # Season 1 Episode 1
-    (re.compile(r'(\d{1,2})x(\d{1,3})', re.IGNORECASE), ('season', 'episode')),  # 1x01 format
-    
-    # Anime patterns
-    (re.compile(r'(\d{1,3})[vV]\d{1}', re.IGNORECASE), (None, 'episode')),  # 01v2
-    (re.compile(r'EP?(\d{1,3})', re.IGNORECASE), (None, 'episode')),  # EP01 or E01
-    (re.compile(r'(\d{1,3})[\._]', re.IGNORECASE), (None, 'episode')),  # 01. or 01_
-    
-    # Fallback patterns
-    (re.compile(r'\[(\d{1,3})\]', re.IGNORECASE), (None, 'episode')),  # [01]
-    (re.compile(r'\b(\d{1,3})\b', re.IGNORECASE), (None, 'episode')),  # Standalone numbers
-    
-    # Additional comprehensive patterns
-    (re.compile(r'\[S(\d{1,2})[\s\-]+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),  # [S01 E06]
-    (re.compile(r'\[S(\d{1,2})[\s\-]+(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),  # [S01 06]
-    (re.compile(r'\[S\s*(\d{1,2})\s*E\s*(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),  # [S 1 E 1]
-    (re.compile(r'S(\d+)E(\d+)', re.IGNORECASE), ('season', 'episode')),  # S01E06
-    (re.compile(r'S(\d+)[\s-]*(?:E|EP)(\d+)', re.IGNORECASE), ('season', 'episode')),  # S01 E06
-    (re.compile(r'Season\s*(\d+)\s*-\s*Episode\s*(\d+)', re.IGNORECASE), ('season', 'episode')),  # Season 1 - Episode 1
-    (re.compile(r'Ep\.?\s*(\d+)', re.IGNORECASE), (None, 'episode')),  # Ep1 or Ep.1
-    (re.compile(r'\[Ep(\d+)\]', re.IGNORECASE), (None, 'episode')),  # [Ep1]
-    (re.compile(r'Episode\s*(\d+)', re.IGNORECASE), (None, 'episode')),  # Episode 1
-    (re.compile(r'Part\s*(\d+)', re.IGNORECASE), (None, 'episode')),  # Part 1
-    (re.compile(r'(\d{1,2})[-_](\d{1,3})', re.IGNORECASE), ('season', 'episode')),  # 1-01 or 1_01
-    (re.compile(r'(\d{1,2})\.(\d{1,3})', re.IGNORECASE), ('season', 'episode')),  # 1.01
+    (re.compile(r'\[S(\d{1,2})[\s\-]*E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),
+    (re.compile(r'S(\d{1,2})[\s\-]*E(\d{1,3})', re.IGNORECASE), ('season', 'episode')),
+    (re.compile(r'S(\d{1,2})[\._]?E(\d{1,3})', re.IGNORECASE), ('season', 'episode')),
+    (re.compile(r'Season[\s\-]*(\d{1,2})[\s\-]*Episode[\s\-]*(\d{1,3})', re.IGNORECASE), ('season', 'episode')),
+    (re.compile(r'(\d{1,2})x(\d{1,3})', re.IGNORECASE), ('season', 'episode')),
+    (re.compile(r'(\d{1,3})[vV]\d{1}', re.IGNORECASE), (None, 'episode')),
+    (re.compile(r'EP?(\d{1,3})', re.IGNORECASE), (None, 'episode')),
+    (re.compile(r'(\d{1,3})[\._]', re.IGNORECASE), (None, 'episode')),
+    (re.compile(r'\[(\d{1,3})\]', re.IGNORECASE), (None, 'episode')),
+    (re.compile(r'\b(\d{1,3})\b', re.IGNORECASE), (None, 'episode')),
 ]
 
 QUALITY_PATTERNS = [
-    # Resolution patterns
-    (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1)),  # [1080p]
-    (re.compile(r'\b(\d{3,4})p\b', re.IGNORECASE), lambda m: f"{m.group(1)}p"),  # 1080p
-    (re.compile(r'\b(4k|2160p|UHD)\b', re.IGNORECASE), lambda m: "2160p"),  # 4K
-    (re.compile(r'\b(2k|1440p|QHD)\b', re.IGNORECASE), lambda m: "1440p"),  # 2K
-    (re.compile(r'\b(1080p|FHD)\b', re.IGNORECASE), lambda m: "1080p"),  # 1080p
-    (re.compile(r'\b(720p|HD)\b', re.IGNORECASE), lambda m: "720p"),  # 720p
-    (re.compile(r'\b(480p|SD)\b', re.IGNORECASE), lambda m: "480p"),  # 480p
-    (re.compile(r'\b(360p)\b', re.IGNORECASE), lambda m: "360p"),  # 360p
-    (re.compile(r'\b(240p)\b', re.IGNORECASE), lambda m: "240p"),  # 240p
-    (re.compile(r'\b(144p)\b', re.IGNORECASE), lambda m: "144p"),  # 144p
-    
-    # Source/encoding patterns
-    (re.compile(r'\b(HDRip|HDTV|WEB-DL|WEBRip|BluRay|BDRip|BRRip|DVDRip|HDR)\b', re.IGNORECASE), lambda m: m.group(1)),
-    (re.compile(r'\b(x264|x265|HEVC|AVC|h264|h265)\b', re.IGNORECASE), lambda m: m.group(1).lower().replace('h264', 'x264').replace('h265', 'x265')),
-    
-    # Audio patterns
-    (re.compile(r'\b(AAC|AC3|DTS|DD\+?5\.1|2\.0)\b', re.IGNORECASE), lambda m: m.group(1)),
-    
-    # Additional comprehensive patterns
-    (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1)),  # [1080p]
-    (re.compile(r'\b(\d{3,4})p\b', re.IGNORECASE), lambda m: f"{m.group(1)}p"),  # 1080p
-    (re.compile(r'\b(4k|2160p|4k_SDR)\b', re.IGNORECASE), lambda m: "2160p"),  # 4K
-    (re.compile(r'\b(2k|1440p)\b', re.IGNORECASE), lambda m: "1440p"),  # 2K
-    (re.compile(r'\b(\d{3,4}[pi])\b', re.IGNORECASE), lambda m: m.group(1)),  # 1080i
-    (re.compile(r'\b(4kX264|4kx265)\b', re.IGNORECASE), lambda m: "2160p"),  # 4kX264
-    (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1)),  # [1080p]
-    (re.compile(r'\b(360p|480p|576p)\b', re.IGNORECASE), lambda m: m.group(1)),  # Low resolutions
+    (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1)),
+    (re.compile(r'\b(\d{3,4})p\b', re.IGNORECASE), lambda m: f"{m.group(1)}p"),
+    (re.compile(r'\b(4k|2160p|UHD)\b', re.IGNORECASE), lambda m: "2160p"),
+    (re.compile(r'\b(2k|1440p|QHD)\b', re.IGNORECASE), lambda m: "1440p"),
+    (re.compile(r'\b(1080p|FHD)\b', re.IGNORECASE), lambda m: "1080p"),
+    (re.compile(r'\b(720p|HD)\b', re.IGNORECASE), lambda m: "720p"),
+    (re.compile(r'\b(480p|SD)\b', re.IGNORECASE), lambda m: "480p"),
+    (re.compile(r'\b(360p)\b', re.IGNORECASE), lambda m: "360p"),
+    (re.compile(r'\b(240p)\b', re.IGNORECASE), lambda m: "240p"),
+    (re.compile(r'\b(144p)\b', re.IGNORECASE), lambda m: "144p"),
 ]
 
 CODEC_PATTERNS = [
-    (re.compile(r'\b(x264|x265|HEVC|H264|H265|AVC)\b', re.IGNORECASE), lambda m: m.group(1).lower().replace('h264', 'x264').replace('h265', 'HEVC')),
-    (re.compile(r'\[(x264|x265|HEVC|AVC)\]', re.IGNORECASE), lambda m: m.group(1)),
-    (re.compile(r'\[(H\.264|H\.265)\]', re.IGNORECASE), lambda m: 'x264' if m.group(1) == 'H.264' else 'HEVC'),
-    (re.compile(r'\b(MPEG-?4|AVC)\b', re.IGNORECASE), lambda m: 'x264'),
-    (re.compile(r'\b(HEVC|H\.265)\b', re.IGNORECASE), lambda m: 'HEVC'),
+    (re.compile(r'\b(x264|x265|HEVC|H264|H265|AVC)\b', re.IGNORECASE), 
+     lambda m: m.group(1).lower().replace('h264', 'x264').replace('h265', 'HEVC')),
 ]
 
 LANGUAGE_PATTERNS = [
     (re.compile(r'\[(Sub|Dub|Dual Audio)\]', re.IGNORECASE), lambda m: m.group(1)),
     (re.compile(r'\b(Sub|Dub|Dual)\b', re.IGNORECASE), lambda m: m.group(1)),
-    (re.compile(r'\[(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)\]', re.IGNORECASE), 
-     lambda m: {"Tam": "Tam", "Tamil": "Tam", "Tel": "Tel", "Telugu": "Tel", 
-                "Hin": "Hin", "Hindi": "Hin", "Mal": "Mal", "Malayalam": "Mal",
-                "Kan": "Kan", "Kannada": "Kan", "Eng": "Eng", "English": "Eng",
-                "Jpn": "Jpn", "Japanese": "Jpn"}.get(m.group(1), m.group(1))),
-    (re.compile(r'\b(Tam|Tel|Hin|Mal|Kan|Eng|Jpn)\b', re.IGNORECASE), 
-     lambda m: {"Tam": "Tam", "Tel": "Tel", "Hin": "Hin", "Mal": "Mal",
-                "Kan": "Kan", "Eng": "Eng", "Jpn": "Jpn"}.get(m.group(1))),
-    (re.compile(r'\[(Multi|Dual)\]', re.IGNORECASE), lambda m: m.group(1)),
-    (re.compile(r'\b(Multi|Dual)\b', re.IGNORECASE), lambda m: m.group(1)),
 ]
 
+TITLE_CLEANING_PATTERNS = [
+    r'\[?S\d{1,2}[\s\-]*E\d{1,3}\]?', r'Season\s*\d{1,2}', r'Episode\s*\d{1,3}',
+    r'\d{1,2}x\d{1,3}', r'EP?\d{1,3}', r'\[\d{1,3}\]',
+    r'\[\d{3,4}[pi]\]', r'\d{3,4}p', r'4[kK]', r'2[kK]', 
+    r'HDTV', r'WEB[\- ]?DL', r'WEB[\- ]?Rip', r'Blu[\- ]?Ray',
+    r'x\d{3,4}', r'HDR', r'DTS', r'AAC', r'AC3',
+    r'\[(Sub|Dub|Dual Audio)\]', r'\[(Tam|Tel|Hin|Mal|Kan|Eng|Jpn)\]',
+    r'\[.*?\]', r'\(.*?\)', r'v\d', r'[\-_]', r'\d+MB', r'\d+GB',
+    r'\.\w{2,4}$', r'\d+p', r'x\d{3,4}',
+]
+
+COMMON_WORDS_TO_REMOVE = [
+    'complete', 'full', 'uncut', 'remastered', 'extended',
+    'dual', 'multi', 'proper', 'repack', 'rerip',
+    'limited', 'special edition', 'directors cut',
+    'webdl', 'webrip', 'bluray', 'bdrip', 'brrip',
+    'dvdrip', 'hdtv', 'hdr', 'uhd', '4k', '1080p', '720p'
+]
+
+def clean_title(raw_title):
+    """Clean and format the extracted title"""
+    if not raw_title:
+        return "Unknown"
+    
+    for pattern in TITLE_CLEANING_PATTERNS:
+        raw_title = re.sub(pattern, '', raw_title, flags=re.IGNORECASE)
+    
+    for word in COMMON_WORDS_TO_REMOVE:
+        raw_title = re.sub(rf'\b{word}\b', '', raw_title, flags=re.IGNORECASE)
+    
+    title = re.sub(r'[^\w\s]', ' ', raw_title)
+    title = re.sub(r'\s+', ' ', title).strip()
+    
+    if not title:
+        return "Unknown"
+    
+    return format_title_case(title)
+
+def format_title_case(title):
+    """Properly format title case with exceptions"""
+    if not title:
+        return ""
+    
+    lowercase_words = {
+        'a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on',
+        'at', 'to', 'from', 'by', 'of', 'in', 'with', 'as', 'is'
+    }
+    
+    words = title.split()
+    if not words:
+        return ""
+    
+    formatted_words = []
+    for i, word in enumerate(words):
+        if i > 0 and word.lower() in lowercase_words:
+            formatted_words.append(word.lower())
+        else:
+            if "'" in word:
+                parts = word.split("'")
+                formatted = []
+                for part in parts:
+                    if part:
+                        formatted.append(part[0].upper() + part[1:].lower())
+                    else:
+                        formatted.append("'")
+                formatted_words.append("'".join(formatted))
+            else:
+                formatted_words.append(word[0].upper() + word[1:].lower())
+    
+    return ' '.join(formatted_words)
+
+def extract_title_from_filename(filename):
+    """Main title extraction function"""
+    if not filename:
+        return "Unknown"
+    
+    filename = re.sub(r'\.[^\.]+$', '', filename)
+    
+    bracket_match = re.search(r'\[([^\]]+)\]', filename)
+    if bracket_match:
+        potential_title = bracket_match.group(1)
+        if (len(potential_title.split()) > 1 and 
+            not any(word in potential_title.lower() for word in COMMON_WORDS_TO_REMOVE)):
+            return clean_title(potential_title)
+    
+    patterns = [
+        r'^(.*?)(?:\s*[-_]\s*[\[\(]|\[|\()',
+        r'^(.*?)(?:\s+[\[\(]|$)'
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, filename)
+        if match:
+            potential_title = match.group(1)
+            if potential_title and len(potential_title.split()) >= 1:
+                return clean_title(potential_title)
+    
+    return clean_title(filename)
+
 def extract_season_episode(filename):
-    """Enhanced season/episode extraction with better pattern matching"""
+    """Enhanced season/episode extraction"""
     if not filename:
         return None, None
     
-    # Try all patterns in order
     for pattern, (season_group, episode_group) in SEASON_EPISODE_PATTERNS:
         match = pattern.search(filename)
         if match:
@@ -902,7 +951,6 @@ def extract_quality(filename):
     if not filename:
         return None
     
-    # Try resolution patterns first
     for pattern, extractor in QUALITY_PATTERNS:
         match = pattern.search(filename)
         if match:
@@ -928,7 +976,6 @@ async def extract_codec(filename, file_path):
     if not filename and not file_path:
         return None
     
-    # Try filename first
     for pattern, extractor in CODEC_PATTERNS:
         match = pattern.search(filename)
         if match:
@@ -936,7 +983,6 @@ async def extract_codec(filename, file_path):
             logger.info(f"Extracted codec: {codec} from {filename}")
             return codec
     
-    # Fallback to ffprobe if file_path is provided
     if file_path:
         ffprobe = shutil.which('ffprobe')
         if not ffprobe:
@@ -973,6 +1019,7 @@ async def extract_codec(filename, file_path):
         except Exception as e:
             logger.error(f"Codec detection error: {e}")
             return None
+
 async def detect_audio_info(file_path):
     """Detect audio and subtitle information using ffprobe."""
     ffprobe = shutil.which('ffprobe')
@@ -1099,7 +1146,6 @@ def get_audio_label(audio_info, filename=None):
         'jpn': 'Jpn', 'japanese': 'Jpn'
     }
 
-    # Check filename for explicit language group if provided
     if filename:
         lang_match = re.search(
             r'\[((?:\s*(?:Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)\s*\+?)+)\]',
@@ -1113,7 +1159,6 @@ def get_audio_label(audio_info, filename=None):
             normalized = [LANG_MAP.get(lang.lower(), lang) for lang in raw_langs]
             return f"[{' + '.join(sorted(set(normalized)))}]"
 
-        # If no audio streams, fallback to filename single match
         if audio_count == 0:
             lang_match = re.search(
                 r'\b(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)\b',
@@ -1123,14 +1168,12 @@ def get_audio_label(audio_info, filename=None):
                 lang = lang_match.group(1).lower()
                 return LANG_MAP.get(lang, lang)
 
-    # Multiple audio tracks
     if audio_count > 1 and audio_languages:
         unique_languages = sorted(set(lang for lang in audio_languages if lang != 'Unknown'))
         if unique_languages:
             return f"[{' + '.join(unique_languages)}]"
         return "Multi"
 
-    # Single audio
     if audio_count == 1:
         lang = audio_languages[0] if audio_languages else 'Unknown'
         if lang == 'Jpn' and english_subs >= 1:
@@ -1140,6 +1183,7 @@ def get_audio_label(audio_info, filename=None):
         return lang if lang != 'Unknown' else None
 
     return "Multi" if audio_count > 1 else None
+
 def extract_year(filename):
     """Extract year from filename."""
     match = re.search(r'\b(19\d{2}|20\d{2})\b(?!\w)', filename)
@@ -1205,35 +1249,23 @@ def extract_title(source_text):
     if not source_text:
         return "Unknown"
     
-    # Remove common metadata patterns
     patterns_to_remove = [
-        # Season/episode patterns
         r'\[?S\d{1,2}[\s\-]*E\d{1,3}\]?', r'Season\s*\d{1,2}', r'Episode\s*\d{1,3}',
         r'\d{1,2}x\d{1,3}', r'EP?\d{1,3}', r'\[\d{1,3}\]',
-        
-        # Quality/resolution patterns
         r'\[\d{3,4}[pi]\]', r'\d{3,4}p', r'4[kK]', r'2[kK]', 
         r'HDTV', r'WEB[\- ]?DL', r'WEB[\- ]?Rip', r'Blu[\- ]?Ray',
         r'x\d{3,4}', r'HDR', r'DTS', r'AAC', r'AC3',
-        
-        # Language patterns
         r'\[(Sub|Dub|Dual Audio)\]', r'\[(Tam|Tel|Hin|Mal|Kan|Eng|Jpn)\]',
-        
-        # Other common patterns
         r'\[.*?\]', r'\(.*?\)', r'v\d', r'[\-_]', r'\d+MB', r'\d+GB',
         r'\[.*\]', r'\(.*\)', r'\.\w{2,4}$', r'\d+p', r'x\d{3,4}',
-        r'\[.*\]', r'\(.*\)', r'\.\w{2,4}$', r'\d+p', r'x\d{3,4}',
-        r'\[.*\]', r'\(.*\)', r'\.\w{2,4}$', r'\d+p', r'x\d{3,4}'
     ]
     
     for pattern in patterns_to_remove:
         source_text = re.sub(pattern, '', source_text, flags=re.IGNORECASE)
     
-    # Clean up remaining special characters and whitespace
-    source_text = re.sub(r'[^\w\s]', ' ', source_text)  # Replace special chars with space
-    source_text = re.sub(r'\s+', ' ', source_text).strip()  # Remove extra spaces
+    source_text = re.sub(r'[^\w\s]', ' ', source_text)
+    source_text = re.sub(r'\s+', ' ', source_text).strip()
     
-    # Title case formatting
     words = source_text.split()
     formatted_words = []
     for word in words:
@@ -1246,19 +1278,14 @@ def extract_title(source_text):
 
 def format_filename(template, replacements):
     """Apply formatting with proper brackets and spacing"""
-    # First pass - replace all placeholders
     filename = template.format(**replacements)
-    
-    # Second pass - clean up formatting
-    filename = re.sub(r'\[[\s\-]*\]', '', filename)  # Remove empty brackets
-    filename = re.sub(r'\s+', ' ', filename).strip()  # Remove extra spaces
-    filename = re.sub(r'(?<!\w)\.(?!\w)', '', filename)  # Remove standalone dots
-    
-    # Ensure proper spacing around brackets
+    filename = re.sub(r'\[[\s\-]*\]', '', filename)
+    filename = re.sub(r'\s+', ' ', filename).strip()
+    filename = re.sub(r'(?<!\w)\.(?!\w)', '', filename)
     filename = re.sub(r'(\S)\[', r'\1 [', filename)
     filename = re.sub(r'\](\S)', r'] \1', filename)
-    
     return filename
+
 async def process_thumbnail(thumb_path):
     if not thumb_path or not await aiofiles.os.path.exists(thumb_path):
         return None
@@ -1300,7 +1327,6 @@ async def add_metadata(input_path, output_path, user_id):
         'commentz': await DARKXSIDE78.get_commentz(user_id)
     }
 
-    # First try with all metadata
     try:
         cmd = [
             ffmpeg,
@@ -1335,7 +1361,6 @@ async def add_metadata(input_path, output_path, user_id):
     except Exception as e:
         logger.warning(f"Full metadata addition failed, trying with basic metadata: {e}")
 
-    # Fallback to just title if full metadata fails
     try:
         cmd = [
             ffmpeg,
@@ -1371,56 +1396,6 @@ async def add_metadata(input_path, output_path, user_id):
         logger.error(f"Metadata processing failed: {e}")
         await cleanup_files(output_path)
         raise
-
-def extract_chapter(filename): 
-    """Extract chapter number from filename"""
-    if not filename:
-        return None
-
-    patterns = [
-        r'Ch(\d+)', r'Chapter(\d+)', r'CH(\d+)', 
-        r'ch(\d+)', r'Chap(\d+)', r'chap(\d+)',
-        r'Ch\.(\d+)', r'Chapter\.(\d+)', r'CH\.(\d+)',
-        r'ch\.(\d+)', r'Chap\.(\d+)', r'chap\.(\d+)',
-        r'Ch-(\d+)', r'Chapter-(\d+)', r'CH-(\d+)',
-        r'ch-(\d+)', r'Chap-(\d+)', r'chap-(\d+)',
-        r'CH-(\d+)', r'CHAP-(\d+)', r'CHAPTER (\d+)',
-        r'Ch (\d+)', r'Chapter (\d+)', r'CH (\d+)',
-        r'ch (\d+)', r'Chap (\d+)', r'chap (\d+)',
-        r'\[Ch(\d+)\]', r'\[Chapter(\d+)\]', r'\[CH(\d+)\]',
-        r'\[ch(\d+)\]', r'\[Chap(\d+)\]', r'\[chap(\d+)\]',
-        r'\[C(\d+)\]'
-    ]
-    
-    for pattern in patterns:
-        match = re.search(pattern, filename, re.IGNORECASE)
-        if match:
-            return match.group(1).zfill(2)
-    
-    return None
-
-def extract_volume(filename):
-    """Extract volume number from filename"""
-    if not filename:
-        return None
-
-    patterns = [
-        r'\[V(?:ol(?:ume)?)?[._ -]?(\d+)\]',
-        r'V(?:ol(?:ume)?)?[._ -]?(\d+)',
-        r'\bvol(?:ume)?[._ -]?(\d+)\b',
-        r'\bvol(?:ume)?\s*(\d+)\b',
-        r'\(vol(?:ume)?[._ -]?(\d+)\)',
-        r'\bV\s*[\.:_-]?\s*(\d+)\b',
-        r'\bVol\s*[\.:_-]?\s*(\d+)\b',
-        r'\bVolume\s*[\.:_-]?\s*(\d+)\b'
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, filename, re.IGNORECASE)
-        if match:
-            return match.group(1).zfill(2)
-
-    return None
 
 async def convert_to_mkv(input_path, output_path):
     """Convert video file to MKV format"""
@@ -1460,6 +1435,7 @@ async def auto_rename_files(client, message: Message):
 
     if ADMIN_MODE and user_id not in ADMINS:
         return await message.reply_text("Admin mode is active - Only admins can use this bot!")
+    
     autorename_enabled = await DARKXSIDE78.get_autorename_status(user_id)
     if not autorename_enabled:
         return await message.reply_text("🔕 Auto-Rename is turned OFF.\nUse /autorename_on to enable it.")
@@ -1542,9 +1518,9 @@ async def auto_rename_files(client, message: Message):
             quality = extract_quality(source_text)
             language = extract_language(file_name)
             title = extract_title(source_text)
-            codec = await extract_codec(source_text, None)  # Extract codec from filename first
-            year = extract_year(source_text)  # Extract year from source text
-            
+            codec = await extract_codec(source_text, None)
+            year = extract_year(source_text)
+    
             if not format_template:
                 return await message.reply_text("Auto rename format not set\nPlease set a rename format using /autorename")
     
@@ -1590,10 +1566,9 @@ async def auto_rename_files(client, message: Message):
                 await asyncio.sleep(1)
                 await msg.edit("Download Complete")
                 audio_info = await detect_audio_info(file_path)
-                audio_label = get_audio_label(audio_info, file_name)  # Pass file_name as fallback
+                audio_label = get_audio_label(audio_info, file_name)
                 actual_resolution = await detect_video_resolution(file_path)
-                # Re-extract codec using the downloaded file for accuracy
-                codec = await extract_codec(file_name, file_path)  # Re-extract codec with file_path    
+                codec = await extract_codec(file_name, file_path)
                 
                 replacements = {
                     '{season}': season or '',
@@ -1602,60 +1577,10 @@ async def auto_rename_files(client, message: Message):
                     '{volume}': volume or 'XX',
                     '{quality}': quality or '',
                     '{audio}': audio_label or '',
-                    '{Season}': season or '',
-                    '{Episode}': episode or '',
-                    '{Chapter}': chapter or 'XX',
-                    '{Volume}': volume or 'XX',
-                    '{Quality}': quality or '',
-                    '{Audio}': audio_label or '',
-                    '{SEASON}': season or '',
-                    '{EPISODE}': episode or '',
-                    '{CHAPTER}': chapter or 'XX',
-                    '{VOLUME}': volume or 'XX',
-                    '{QUALITY}': quality or '',
-                    '{AUDIO}': audio_label or '',
-                    'season': season or '',
-                    'episode': episode or '',
-                    'chapter': chapter or 'XX',
-                    'volume': volume or 'XX',
-                    'quality': quality or '',
-                    'audio': audio_label or '',
-                    'Season': season or '',
-                    'Episode': episode or '',
-                    'Chapter': chapter or 'XX',
-                    'Volume': volume or 'XX',
-                    'Quality': quality or '',
-                    'Audio': audio_label or '',
-                    'SEASON': season or '',
-                    'EPISODE': episode or '',
-                    'CHAPTER': chapter or 'XX',
-                    'VOLUME': volume or 'XX',
-                    'QUALITY': quality or '',
-                    'AUDIO': audio_label or '',
                     '{resolution}': actual_resolution or '',
-                    '{Resolution}': actual_resolution or '',
-                    '{RESOLUTION}': actual_resolution or '',
-                    'resolution': actual_resolution or '',
-                    'Resolution': actual_resolution or '',
-                    'RESOLUTION': actual_resolution or '',
                     '{title}': title or '',
-                    '{Title}': title or '',
-                    '{TITLE}': title or '',
-                    'title': title or '',
-                    'Title': title or '',
-                    'TITLE': title or '',
                     '{codec}': codec or '',
-                    '{Codec}': codec or '',
-                    '{CODEC}': codec or '',
-                    'codec': codec or '',
-                    'Codec': codec or '',
-                    'CODEC': codec or '',
-                    '{year}': year or '',  # Add year placeholders
-                    '{Year}': year or '',
-                    '{YEAR}': year or '',
-                    'year': year or '',
-                    'Year': year or '',
-                    'YEAR': year or '',
+                    '{year}': year or '',
                 }
     
                 new_filename = f"{format_template.format(**replacements)}{ext}"
@@ -1907,7 +1832,6 @@ async def auto_rename_files(client, message: Message):
     )
     
     await task_queue.add_task(user_id, file_id, message, process_file())
-
 
 @Client.on_message(filters.command("renamed") & (filters.group | filters.private))
 @check_ban_status
