@@ -1012,7 +1012,51 @@ def extract_quality(filename):
             qualities.append(quality)
     
     return " ".join(qualities) if qualities else ""
+async def detect_audio_info(file_path):
+    ffprobe = shutil.which('ffprobe')
+    if not ffprobe:
+        raise RuntimeError("ffprobe not found in PATH")
 
+    cmd = [
+        ffprobe,
+        '-v', 'quiet',
+        '-print_format', 'json',
+        '-show_streams',
+        file_path
+    ]
+
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await process.communicate()
+
+    try:
+        info = json.loads(stdout)
+        streams = info.get('streams', [])
+        
+        audio_streams = [s for s in streams if s.get('codec_type') == 'audio']
+        sub_streams = [s for s in streams if s.get('codec_type') == 'subtitle']
+
+        japanese_audio = 0
+        english_audio = 0
+        for audio in audio_streams:
+            lang = audio.get('tags', {}).get('language', '').lower()
+            if lang in {'ja', 'jpn', 'japanese'}:
+                japanese_audio += 1
+            elif lang in {'en', 'eng', 'english'}:
+                english_audio += 1
+
+        english_subs = len([
+            s for s in sub_streams 
+            if s.get('tags', {}).get('language', '').lower() in {'en', 'eng', 'english'}
+        ])
+
+        return len(audio_streams), len(sub_streams), japanese_audio, english_audio, english_subs
+    except Exception as e:
+        logger.error(f"Audio detection error: {e}")
+        return 0, 0, 0, 0, 0
 def get_audio_label(filename, audio_info=None):
     """Enhanced audio detection from filename and streams"""
     audio_tags = []
