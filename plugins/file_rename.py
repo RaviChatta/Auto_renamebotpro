@@ -1555,9 +1555,11 @@ async def auto_rename_files(client, message: Message):
     
         try:
             file_name = sanitize_filename(file_name)
-                 # Use sanitized filename for all paths
+            ext = determine_extension(media_type, media_preference, file_ext)
+        
+            # Then use it in path construction
             download_path = f"downloads/{file_name}"
-            metadata_path = f"metadata/{os.path.splitext(file_name)[0]}{os.path.splitext(file_name)[1]}"
+            metadata_path = f"metadata/{os.path.splitext(file_name)[0]}{ext}"
             output_path = f"processed/{os.path.splitext(file_name)[0]}{ext}"
             media_preference = await DARKXSIDE78.get_media_preference(user_id)
             user_data = await DARKXSIDE78.col.find_one({"_id": user_id})
