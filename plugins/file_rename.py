@@ -920,7 +920,7 @@ async def auto_rename_files(client, message: Message):
             else:
                 source_text = file_name
             
-            season, episode, title = extract_season_episode(source_text)
+            season, episode, title = extract_season_episode_title(source_text)
             chapter = extract_chapter(source_text)
             volume = extract_volume(source_text)
             quality = extract_quality(source_text)
