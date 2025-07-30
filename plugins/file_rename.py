@@ -818,7 +818,7 @@ QUALITY_PATTERNS = [
     (re.compile(r'\b(\d{3,4}[pi])\b', re.IGNORECASE), lambda m: m.group(1)),
     (re.compile(r'\b(HDRip|HDTV)\b', re.IGNORECASE), lambda m: m.group(1)),
     # Rule 1: Preserve Sub, Dub, Dual, Multi
-    (re.compile(r'\b(Sub|Dub|Dual|Multi)\b', re.IGNORECASE), lambda m: m.group(1))
+    (re.compile(r'\b(Sub|Dub|Dual|Multi)\b', re.IGNORECASE), lambda m: m.group(1)),
     
     # Rule 2: Remove mentions like @Uploader
     (re.compile(r'@\w+'), lambda m: ""),
