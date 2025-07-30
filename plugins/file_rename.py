@@ -1276,7 +1276,7 @@ def extract_title(source_text):
     
     return ' '.join(formatted_words)
 
-def get_replacements(source_text, file_path=None):
+async def get_replacements(source_text, file_path=None):
     """Generate all possible replacements with fallbacks"""
     if not source_text:
         source_text = ""
