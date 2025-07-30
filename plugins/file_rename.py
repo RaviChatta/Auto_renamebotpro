@@ -191,7 +191,7 @@ def clean_title(raw_title):
         raw_title = re.sub(pattern, '', raw_title, flags=re.IGNORECASE)
 
     # Keep hyphens, colons, apostrophes, dots – only remove dangerous special chars
-    raw_title = re.sub(r'[^\w\s\-:\'.]', '', raw_title)
+    raw_title = re.sub(r'[^\w\s\-:\'.,]', '', raw_title)    
 
     # Normalize spaces
     raw_title = re.sub(r'\s{2,}', ' ', raw_title)
@@ -238,6 +238,7 @@ def extract_season_episode_title(filename):
         return "01", "01", "Unknown"
 
     filename = re.sub(r'\.[^\.]+$', '', filename)
+    filename = filename.replace('_', ' ')
 
     for pattern, (season_group, episode_group) in SEASON_EPISODE_PATTERNS:
         match = pattern.search(filename)
