@@ -15,7 +15,7 @@ from hachoir.parser import createParser
 from pyrogram.enums import ParseMode
 from plugins.antinsfw import check_anti_nsfw
 from helper.utils import progress_for_pyrogram, humanbytes
-from helper.utils import convert
+from helper import convert
 from helper.database import DARKXSIDE78
 from config import Config
 import random
@@ -46,7 +46,60 @@ from pyrogram.enums import ChatAction
 import os
 import tempfile
 from playwright.async_api import async_playwright
+import psutil
+from platform import python_version, system, release
 
+# Constants and Patterns
+SEASON_EPISODE_PATTERNS = [
+    (re.compile(r'\[S(\d{1,2})[\s\-]+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),   # [S01-E06]
+    (re.compile(r'\[S(\d{1,2})[\s\-]+(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),     # [S01-06]
+    (re.compile(r'\[S(\d{1,2})\s+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),        # [S01 E06]
+    (re.compile(r'\[S\s*(\d{1,2})\s*E\s*(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')), # [S 1 E 1]
+    (re.compile(r'S(\d{1,2})[\s\-]+E(\d{1,3})', re.IGNORECASE), ('season', 'episode')),        # S01-E06, S01 E06
+    (re.compile(r'S(\d{1,2})[\s\-]+(\d{1,3})', re.IGNORECASE), ('season', 'episode')),         # S01-06, S01 06
+    (re.compile(r'S(\d+)(?:E|EP)(\d+)'), ('season', 'episode')),
+    (re.compile(r'S(\d+)[\s-]*(?:E|EP)(\d+)'), ('season', 'episode')),
+    (re.compile(r'Season\s*(\d+)\s*Episode\s*(\d+)', re.IGNORECASE), ('season', 'episode')),
+    (re.compile(r'\[S(\d+)\]\[E(\d+)\]'), ('season', 'episode')),
+    (re.compile(r'S(\d+)[^\d]+(\d{1,3})\b'), ('season', 'episode')),
+    (re.compile(r'(?:E|EP|Episode)\s*(\d+)', re.IGNORECASE), (None, 'episode')),
+    (re.compile(r'\b(\d{1,3})\b'), (None, 'episode'))
+]
+
+QUALITY_PATTERNS = [
+    (re.compile(r'\[(\d{3,4}p)\](?:\s*\[\1\])*', re.IGNORECASE), lambda m: m.group(1)),
+    (re.compile(r'\b(\d{3,4})p?\b'), lambda m: f"{m.group(1)}p"),
+    (re.compile(r'\b(4k|2160p)\b', re.IGNORECASE), lambda m: "2160p"),
+    (re.compile(r'\b(2k|1440p)\b', re.IGNORECASE), lambda m: "1440p"),
+    (re.compile(r'\b(\d{3,4}[pi])\b', re.IGNORECASE), lambda m: m.group(1)),
+    (re.compile(r'\b(HDRip|HDTV)\b', re.IGNORECASE), lambda m: m.group(1)),
+    (re.compile(r'\b(4kX264|4kx265)\b', re.IGNORECASE), lambda m: m.group(1)),
+    (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1))
+]
+
+TITLE_CLEANING_PATTERNS = [
+    re.compile(p, re.IGNORECASE) for p in [
+        r'@\w+',
+        r'\[?S\d{1,2}[\s\-]*E\d{1,3}\]?', r'Season\s*\d{1,2}', r'Episode\s*\d{1,3}',
+        r'\d{1,2}x\d{1,3}', r'EP?\d{1,3}', r'\[\d{1,3}\]',
+        r'\[\d{3,4}[pi]\]', r'\d{3,4}p', r'4[kK]', r'2[kK]', 
+        r'HDTV', r'WEB[\- ]?DL', r'WEB[\- ]?Rip', r'Blu[\- ]?Ray',
+        r'x\d{3,4}', r'HDR', r'DTS', r'AAC', r'AC3',
+        r'\[(Sub|Dub|Dual Audio)\]', r'\[(Tam|Tel|Hin|Mal|Kan|Eng|Jpn)\]',
+        r'\[.*?\]', r'\(.*?\)', r'v\d', r'[\-_]', r'\d+MB', r'\d+GB',
+        r'\.\w{2,4}$', r'\d+p', r'x\d{3,4}'
+    ]
+]
+
+COMMON_WORDS_TO_REMOVE = [
+    'complete', 'full', 'uncut', 'remastered', 'extended',
+    'dual', 'multi', 'proper', 'repack', 'rerip',
+    'limited', 'special edition', 'directors cut',
+    'webdl', 'webrip', 'bluray', 'bdrip', 'brrip',
+    'dvdrip', 'hdtv', 'hdr', 'uhd', '4k', '1080p', '720p'
+]
+
+# Utility Functions
 def check_ban_status(func):
     @wraps(func)
     async def wrapper(client, message, *args, **kwargs):
@@ -59,27 +112,6 @@ def check_ban_status(func):
             return
         return await func(client, message, *args, **kwargs)
     return wrapper
-
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
-
-renaming_operations = {}
-active_sequences = {}
-message_ids = {}
-flood_control = {}
-file_queues = {}
-USER_SEMAPHORES = {}
-USER_LIMITS = {}
-tasks = []
-pending_pdf_replace = {}
-pending_pdf_insert = {}
-global PREMIUM_MODE, PREMIUM_MODE_EXPIRY, ADMIN_MODE
-PREMIUM_MODE = Config.GLOBAL_TOKEN_MODE
-PREMIUM_MODE_EXPIRY = Config.GLOBAL_TOKEN_MODE
-CON_LIMIT_ADMIN = Config.ADMIN_OR_PREMIUM_TASK_LIMIT
-CON_LIMIT_NORMAL = Config.NORMAL_TASK_LIMIT
-ADMIN_MODE = Config.ADMIN_USAGE_MODE
-ADMINS = set(Config.ADMIN)
 
 def parse_duration(arg):
     arg = arg.lower().strip()
@@ -95,367 +127,460 @@ def parse_duration(arg):
         return int(arg)
     return None
 
-@Client.on_message(filters.command("pdf_replace") & filters.reply)
-@check_ban_status
-async def pdf_replace_banner(client, message: Message):
-    replied = message.reply_to_message
-    user_id = message.from_user.id
-    if not replied or not replied.document or not replied.document.file_name.lower().endswith(".pdf"):
-        return await message.reply("**Rᴇᴘʟʏ ᴛᴏ ᴀ PDF ᴡɪᴛʜ `/pdf_replace first`, `/pdf_replace last`, ᴏʀ `/pdf_replace first,last`**")
-    args = message.text.split(maxsplit=1)
-    if len(args) < 2 or not args[1].strip():
-        return await message.reply("**Sᴘᴇᴄɪꜰʏ ᴡʜɪᴄʜ ᴘᴀɢᴇ⁽s⁾ ᴛᴏ ʀᴇᴘʟᴀᴄᴇ﹕ `/pdf_replace first`, `/pdf_replace last`, ᴏʀ `/pdf_replace first,last`**")
-    page_args = [x.strip().lower() for x in args[1].split(",") if x.strip() in ("first", "last")]
-    if not page_args:
-        return await message.reply("**Oɴʟʏ `first`, `last`, ᴏʀ ʙᴏᴛʜ ᴀʀᴇ sᴜᴘᴘᴏʀᴛᴇᴅ.**")
-    banner_file_id = await DARKXSIDE78.get_pdf_banner(user_id)
-    if not banner_file_id:
-        return await message.reply("**Yᴏᴜ ʜᴀᴠᴇ ɴᴏᴛ sᴇᴛ ᴀ PDF ʙᴀɴɴᴇʀ. Rᴇᴘʟʏ ᴛᴏ ᴀ ᴘʜᴏᴛᴏ ᴡɪᴛʜ `/set_pdf_banner` ꜰɪʀsᴛ.**")
-    processing_msg = await message.reply("**Pʀᴏᴄᴇssɪɴɢ, ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ ᴀ ꜰᴇᴡ ᴍᴏᴍᴇɴᴛs...**")
-    input_path = await replied.download()
-    output_path = input_path
-    temp_banner_path = input_path + "_banner.jpg"
-    try:
-        await client.download_media(banner_file_id, file_name=temp_banner_path)
-        reader = PdfReader(input_path)
-        writer = PdfWriter()
-        num_pages = len(reader.pages)
-        img = Image.open(temp_banner_path).convert("RGB")
-        img = img.resize((800, 1131))
-        img_pdf_path = temp_banner_path + ".pdf"
-        img_reader = PdfReader(img_pdf_path)
-        img_page = img_reader.pages[0]
-        indices = set()
-        if "first" in page_args:
-            indices.add(0)
-        if "last" in page_args:
-            indices.add(num_pages - 1)
-        for i, page in enumerate(reader.pages):
-            if i in indices:
-                writer.add_page(img_page)
+def clean_title(raw_title):
+    """Clean and format the extracted title"""
+    if not raw_title:
+        return "Unknown"
+    
+    if isinstance(raw_title, (tuple, list)):
+        raw_title = " ".join(str(x) for x in raw_title)
+    elif not isinstance(raw_title, str):
+        raw_title = str(raw_title)
+    
+    for pattern in TITLE_CLEANING_PATTERNS:
+        raw_title = pattern.sub('', raw_title)
+
+    for word in COMMON_WORDS_TO_REMOVE:
+        raw_title = re.sub(rf'\b{re.escape(word)}\b', '', raw_title, flags=re.IGNORECASE)
+    
+    raw_title = re.sub(r'[^\w\s]', ' ', raw_title)
+    raw_title = re.sub(r'\s+', ' ', raw_title).strip()
+    
+    return format_title_case(raw_title) if raw_title else "Unknown"
+
+def format_title_case(title):
+    """Properly format title case with exceptions"""
+    if not title:
+        return ""
+    
+    lowercase_words = {
+        'a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on',
+        'at', 'to', 'from', 'by', 'of', 'in', 'with', 'as', 'is'
+    }
+    
+    words = title.split()
+    if not words:
+        return ""
+    
+    formatted_words = []
+    for i, word in enumerate(words):
+        if i > 0 and word.lower() in lowercase_words:
+            formatted_words.append(word.lower())
+        else:
+            if "'" in word:
+                parts = word.split("'")
+                formatted = []
+                for part in parts:
+                    if part:
+                        formatted.append(part[0].upper() + part[1:].lower())
+                    else:
+                        formatted.append("'")
+                formatted_words.append("'".join(formatted))
             else:
-                writer.add_page(page)
-        with open(output_path, "wb") as f:
-            writer.write(f)
-        thumb = await DARKXSIDE78.get_thumbnail(message.chat.id)
-        thumb_path = None
-        if thumb:
-            thumb_path = await client.download_media(thumb)
-        await client.send_document(
-            message.chat.id,
-            output_path,
-            caption=f"**Rᴇᴘʟᴀᴄᴇᴅ ᴘᴀɢᴇs﹕ {', '.join(page_args)} ᴡɪᴛʜ ʏᴏᴜʀ ʙᴀɴɴᴇʀ.**",
-            thumb=thumb_path if thumb_path else None
-        )
-        if thumb_path:
-            os.remove(thumb_path)
-        await processing_msg.delete()
-    except Exception as e:
-        await processing_msg.delete()
-        await message.reply(f"**Fᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴘʟᴀᴄᴇ ᴘᴀɢᴇs﹕** `{e}`")
-    finally:
-        for path in [input_path, output_path, temp_banner_path, temp_banner_path + ".pdf"]:
-            if os.path.exists(path):
-                os.remove(path)
+                formatted_words.append(word[0].upper() + word[1:].lower())
+    
+    return ' '.join(formatted_words)
 
-@Client.on_message(filters.command("pdf_extractor") & filters.reply)
-@check_ban_status
-async def pdf_extractor_first_last(client, message: Message):
-    replied = message.reply_to_message
-    if not replied or not replied.document or not replied.document.file_name.lower().endswith(".pdf"):
-        return await message.reply("**Rᴇᴘʟʏ ᴛᴏ ᴀ PDF ꜰɪʟᴇ ᴡɪᴛʜ `/pdf_extractor`**")
-    processing_msg = await message.reply("**Pʀᴏᴄᴇssɪɴɢ, ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ ᴀ ꜰᴇᴡ ᴍᴏᴍᴇɴᴛs...**")
-    input_path = await replied.download()
-    first_img_path = None
-    last_img_path = None
-    try:
-        reader = PdfReader(input_path)
-        num_pages = len(reader.pages)
-        first_img = convert_from_path(input_path, first_page=1, last_page=1)[0]
-        last_img = convert_from_path(input_path, first_page=num_pages, last_page=num_pages)[0]
-        first_img_path = input_path.replace(".pdf", "_first.jpg")
-        last_img_path = input_path.replace(".pdf", "_last.jpg")
-        first_img.save(first_img_path, "JPEG")
-        last_img.save(last_img_path, "JPEG")
-        await client.send_photo(message.chat.id, first_img_path, caption="**Fɪʀsᴛ ᴘᴀɢᴇ ᴀs ɪᴍᴀɢᴇ**")
-        await client.send_photo(message.chat.id, last_img_path, caption="**Lᴀsᴛ ᴘᴀɢᴇ ᴀs ɪᴍᴀɢᴇ**")
-        await processing_msg.delete()
-    except Exception as e:
-        await processing_msg.delete()
-        await message.reply(f"**Fᴀɪʟᴇᴅ ᴛᴏ ᴇxᴛʀᴀᴄᴛ ᴘᴀɢᴇs﹕** `{e}`")
-    finally:
-        if os.path.exists(input_path):
-            os.remove(input_path)
-        if first_img_path and os.path.exists(first_img_path):
-            os.remove(first_img_path)
-        if last_img_path and os.path.exists(last_img_path):
-            os.remove(last_img_path)
+def extract_title_from_filename(filename):
+    """Enhanced filename parser with better anime support"""
+    if not filename:
+        return "Unknown"
+    
+    if isinstance(filename, (tuple, list)):
+        filename = " ".join(str(x) for x in filename)
+    elif not isinstance(filename, str):
+        filename = str(filename)
+    
+    filename = re.sub(r'\.[^\.]+$', '', filename)
+    filename = re.sub(r'\[.*?\]', ' ', filename)
+    filename = re.sub(r'@\w+', '', filename)
+    filename = re.sub(r'[\(\)]', ' ', filename)
+    
+    # Anime-specific patterns
+    anime_patterns = [
+        r'(?:\[.*?\])?\s*(.*?)\s*[Ss](\d+)[\s\-_]*[Ee](\d+)\b',
+        r'(.*?)\s*[\-\s_](\d+)x(\d+)\b',
+        r'[Ss](\d+)[\s\-_]*[Ee](\d+)[\s\-_]*(.*?)(?:\s+\[|\s+\d{3,4}p|$)',
+        r'(.*?)\s*[Ss](\d+)[\s\-_]*[Ee](\d+)\b',
+        r'\[?[Ss](\d{1,2})[-_](\d{2})\]?\s*(.*?)(?:\s+\[|\s+\d{3,4}p|$)',
+        r'[Ss](\d{1,2})[_\-]?[Ee](\d{1,2})[_\-]+([A-Za-z0-9:_\-\s]+?)(?=[_\-]+\d{3,4}p|[_\-]+Sub|[_\-]+Dub|$)'
+    ]
+    
+    for pattern in anime_patterns:
+        match = re.search(pattern, filename, re.IGNORECASE)
+        if match:
+            title = match.group(1) if 'x' in pattern else match.group(3) if match.lastindex >= 3 else match.group(0)
+            title = re.sub(r'[\-\_]', ' ', title).strip()
+            if title and title != "Unknown":
+                return format_title_case(title)
 
-@Client.on_message(filters.command("pdf_add") & filters.reply)
-@check_ban_status
-async def pdf_add_banner(client, message: Message):
-    replied = message.reply_to_message
-    user_id = message.from_user.id
-    if not replied or not replied.document or not replied.document.file_name.lower().endswith(".pdf"):
-        return await message.reply("**Rᴇᴘʟʏ ᴛᴏ ᴀ PDF ᴡɪᴛʜ `/pdf_add first`, `/pdf_add last`, ᴏʀ `/pdf_add first,last`**")
-    args = message.text.split(maxsplit=1)
-    if len(args) < 2 or not args[1].strip():
-        return await message.reply("**Sᴘᴇᴄɪꜰʏ ᴡʜᴇʀᴇ ᴛᴏ ᴀᴅᴅ﹕ `/pdf_add first`, `/pdf_add last`, ᴏʀ `/pdf_add first,last`**")
-    page_args = [x.strip().lower() for x in args[1].split(",") if x.strip() in ("first", "last")]
-    if not page_args:
-        return await message.reply("**Oɴʟʏ `first`, `last`, ᴏʀ ʙᴏᴛʜ ᴀʀᴇ sᴜᴘᴘᴏʀᴛᴇᴅ.**")
-    banner_file_id = await DARKXSIDE78.get_pdf_banner(user_id)
-    if not banner_file_id:
-        return await message.reply("**Yᴏᴜ ʜᴀᴠᴇ ɴᴏᴛ sᴇᴛ ᴀ PDF ʙᴀɴɴᴇʀ. Rᴇᴘʟʏ ᴛᴏ ᴀ ᴘʜᴏᴛᴏ ᴡɪᴛʜ `/set_pdf_banner` ꜰɪʀsᴛ.**")
-    processing_msg = await message.reply("**Pʀᴏᴄᴇssɪɴɢ, ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ ᴀ ꜰᴇᴡ ᴍᴏᴍᴇɴᴛs...**")
-    input_path = await replied.download()
-    output_path = input_path
-    temp_banner_path = input_path + "_banner.jpg"
-    try:
-        await client.download_media(banner_file_id, file_name=temp_banner_path)
-        reader = PdfReader(input_path)
-        writer = PdfWriter()
-        num_pages = len(reader.pages)
-        img = Image.open(temp_banner_path).convert("RGB")
-        img_pdf_path = temp_banner_path + ".pdf"
-        img.save(img_pdf_path, "PDF")
-        img_reader = PdfReader(img_pdf_path)
-        img_page = img_reader.pages[0]
-        if "first" in page_args:
-            writer.add_page(img_page)
-        for page in reader.pages:
-            writer.add_page(page)
-        if "last" in page_args:
-            writer.add_page(img_page)
-        with open(output_path, "wb") as f:
-            writer.write(f)
-        thumb = await DARKXSIDE78.get_thumbnail(message.chat.id)
-        thumb_path = None
-        if thumb:
-            thumb_path = await client.download_media(thumb)
-        await client.send_document(
-            message.chat.id,
-            output_path,
-            caption=f"**Aᴅᴅᴇᴅ ʙᴀɴɴᴇʀ ᴘᴀɢᴇ(s): {', '.join(page_args)}**",
-            thumb=thumb_path if thumb_path else None
-        )
-        if thumb_path:
-            os.remove(thumb_path)
-        await processing_msg.delete()
-    except Exception as e:
-        await processing_msg.delete()
-        await message.reply(f"**Fᴀɪʟᴇᴅ ᴛᴏ ᴀᴅᴅ ʙᴀɴɴᴇʀ ᴘᴀɢᴇ⁽s⁾﹕** `{e}`")
-    finally:
-        for path in [input_path, output_path, temp_banner_path, temp_banner_path + ".pdf"]:
-            if os.path.exists(path):
-                os.remove(path)
+    # Enhanced bracket-based extraction
+    bracket_match = re.search(r'\]\s*([^\[\]]+?)\s*(?:\d{3,4}p|\[|$)', filename)
+    if bracket_match:
+        potential_title = bracket_match.group(1).strip()
+        if len(potential_title.split()) > 1:
+            return clean_title(potential_title)
 
-@Client.on_message(filters.command("set_pdf_lock"))
-@check_ban_status
-async def set_pdf_lock_cmd(client, message: Message):
-    args = message.text.split(maxsplit=1)
-    if len(args) < 2 or not args[1].strip():
-        return await message.reply("** Usᴀɢᴇ﹕** `/set_pdf_lock yourpassword`")
-    password = args[1].strip()
-    await DARKXSIDE78.set_pdf_lock_password(message.from_user.id, password)
-    await message.reply("**Dᴇꜰᴀᴜʟᴛ PDF ʟᴏᴄᴋ ᴘᴀssᴡᴏʀᴅ sᴇᴛ﹗ Nᴏᴡ ʏᴏᴜ ᴄᴀɴ ᴜsᴇ `/pdf_lock` ᴡɪᴛʜᴏᴜᴛ sᴘᴇᴄɪꜰʏɪɴɢ ᴀ ᴘᴀssᴡᴏʀᴅ.**")
+    # Quality-based separation
+    quality_match = re.search(r'(.*?)\s*(?:\d{3,4}p|WEB|BluRay|HDRip)', filename, re.IGNORECASE)
+    if quality_match:
+        potential_title = quality_match.group(1).strip()
+        if potential_title:
+            return clean_title(potential_title)
 
-@Client.on_message(filters.command("pdf_lock") & filters.reply)
-@check_ban_status
-async def pdf_lock_password(client, message: Message):
-    replied = message.reply_to_message
-    if not replied or not replied.document or not replied.document.file_name.lower().endswith(".pdf"):
-        return await message.reply("**Rᴇᴘʟʏ ᴛᴏ ᴀ PDF ꜰɪʟᴇ ᴡɪᴛʜ `/pdf_lock yourpassword`**")
-    args = message.text.split(maxsplit=1)
-    if len(args) < 2 or not args[1].strip():
-        password = await DARKXSIDE78.get_pdf_lock_password(message.from_user.id)
-        if not password:
-            return await message.reply("**Nᴏ ᴘᴀssᴡᴏʀᴅ sᴇᴛ﹗ Usᴇ `/set_pdf_lock yourpassword` ꜰɪʀsᴛ ᴏʀ `/pdf_lock yourpassword`**")
-    else:
-        password = args[1].strip()
-    input_path = await replied.download()
-    output_path = input_path.replace(".pdf", "_locked.pdf")
-    processing_msg = await message.reply("**Pʀᴏᴄᴇssɪɴɢ, ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ ᴀ ꜰᴇᴡ ᴍᴏᴍᴇɴᴛs...**")
-    try:
-        reader = PdfReader(input_path)
-        writer = PdfWriter()
-        for page in reader.pages:
-            writer.add_page(page)
-        writer.encrypt(password)
-        with open(output_path, "wb") as f:
-            writer.write(f)
-        thumb = await DARKXSIDE78.get_thumbnail(message.chat.id)
-        thumb_path = None
-        if thumb:
-            thumb_path = await client.download_media(thumb)
-        await client.send_document(
-            message.chat.id,
-            output_path,
-            caption="**Tʜᴇ PDF ʜᴀs ʙᴇᴇɴ ʟᴏᴄᴋᴇᴅ ᴡɪᴛʜ ʏᴏᴜʀ ᴘᴀssᴡᴏʀᴅ.**",
-            thumb=thumb_path if thumb_path else None
-        )
-        if thumb_path:
-            os.remove(thumb_path)
-        await processing_msg.delete()
-    except Exception as e:
-        await processing_msg.delete()
-        await message.reply(f"**Fᴀɪʟᴇᴅ ᴛᴏ ʟᴏᴄᴋ PDF﹕** `{e}`")
-    finally:
-        if os.path.exists(input_path):
-            os.remove(input_path)
-        if os.path.exists(output_path):
-            os.remove(output_path)
+    # Fallback patterns
+    fallback_patterns = [
+        r'^(.*?)(?:\s+-\s+\d+|$)',      # Before episode number
+        r'^(.*?)(?:\s+\(\d{4}\)|$)',    # Before year
+        r'^(.*?)(?:\s+\d{3,4}p|$)',     # Before quality
+        r'^(.*?)(?:\s+[Ss]\d|$)'        # Before season
+    ]
+    
+    for pattern in fallback_patterns:
+        match = re.search(pattern, filename)
+        if match:
+            potential_title = match.group(1).strip()
+            if potential_title:
+                return clean_title(potential_title)
 
-@Client.on_message(filters.command("pdf_remove") & filters.reply)
-@check_ban_status
-async def pdf_remove_pages(client, message: Message):
-    replied = message.reply_to_message
-    if not replied or not replied.document or not replied.document.file_name.lower().endswith(".pdf"):
-        return await message.reply("**Rᴇᴘʟʏ ᴛᴏ ᴀ PDF ғɪʟᴇ ᴡɪᴛʜ /pdf_remove 1,2,3**")
-    args = message.text.split(maxsplit=1)
-    if len(args) < 2:
-        return await message.reply("**Sᴘᴇᴄɪғʏ ᴘᴀɢᴇs ᴛᴏ ʀᴇᴍᴏᴠᴇ, ᴇ.ɢ. /pdf_remove 1,3,5**")
-    remove_pages = [int(x.strip())-1 for x in args[1].split(",") if x.strip().isdigit()]
-    input_path = await replied.download()
-    output_path = input_path.replace(".pdf", "_removed.pdf")
-    processing_msg = await message.reply("**Pʀᴏᴄᴇssɪɴɢ, ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ ᴀ ꜰᴇᴡ ᴍᴏᴍᴇɴᴛs...**")
-    try:
-        reader = PdfReader(input_path)
-        writer = PdfWriter()
-        for i, page in enumerate(reader.pages):
-            if i not in remove_pages:
-                writer.add_page(page)
-        with open(output_path, "wb") as f:
-            writer.write(f)
-        # Fetch user thumbnail if set
-        thumb = await DARKXSIDE78.get_thumbnail(message.chat.id)
-        thumb_path = None
-        if thumb:
-            thumb_path = await client.download_media(thumb)
-        await client.send_document(
-            message.chat.id,
-            output_path,
-            caption=f"**Rᴇᴍᴏᴠᴇᴅ ᴘᴀɢᴇs: {args[1]}**",
-            thumb=thumb_path if thumb_path else None
-        )
-        if thumb_path:
-            os.remove(thumb_path)
-        await processing_msg.delete()
-    except Exception as e:
-        await processing_msg.delete()
-        await message.reply(f"**Fᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴍᴏᴠᴇ ᴘᴀɢᴇs﹕** `{e}`")
-    finally:
-        if os.path.exists(input_path):
-            os.remove(input_path)
-        if os.path.exists(output_path):
-            os.remove(output_path)
+    return clean_title(filename)
 
-@Client.on_message(filters.command("upscale_ffmpeg") & filters.reply)
-@check_ban_status
-async def ffmpeg_upscale_photo(client, message):
-    replied = message.reply_to_message
-    if not replied or not replied.photo:
-        return await message.reply("**Rᴇᴘʟʏ ᴛᴏ ᴀ ᴘʜᴏᴛᴏ ᴡɪᴛʜ /upscale_ffmpeg ᴛᴏ ᴜᴘsᴄᴀʟᴇ ɪᴛ (ʟᴏᴄᴀʟʟʏ, ɴᴏ API ɴᴇᴇᴅᴇᴅ)﹗**")
-    status = await message.reply("**Uᴘsᴄᴀʟɪɴɢ ɪᴍᴀɢᴇ ᴡɪᴛʜ FFᴍᴘᴇɢ... Pʟᴇᴀsᴇ ᴡᴀɪᴛ.**")
-    input_path = await replied.download()
-    output_path = "upscale_img.jpg"
+def extract_season_episode(filename):
+    """Enhanced season/episode extraction with title detection"""
+    if not filename:
+        return "01", None, "Unknown"
+    
+    # First try to extract title
+    title = extract_title_from_filename(filename)
+    
+    # Then extract season/episode
+    for pattern, (season_group, episode_group) in SEASON_EPISODE_PATTERNS:
+        match = pattern.search(filename)
+        if match:
+            season = episode = None
+            if season_group:
+                season = match.group(1).zfill(2) if match.group(1) else "01"
+            if episode_group:
+                episode = match.group(2 if season_group else 1).zfill(2)
+            
+            return season or "01", episode, title
+    
+    return "01", None, title
+
+def extract_quality(filename):
+    """Extract quality information from filename"""
+    if not filename:
+        return "Unknown"
+    
+    seen = set()
+    quality_parts = []
+    
+    for pattern, extractor in QUALITY_PATTERNS:
+        match = pattern.search(filename)
+        if match:
+            quality = extractor(match).lower()
+            if quality not in seen:
+                quality_parts.append(quality)
+                seen.add(quality)
+                filename = filename.replace(match.group(0), '', 1)
+    
+    return " ".join(quality_parts) if quality_parts else "Unknown"
+
+def extract_chapter(filename): 
+    """Extract chapter number from filename"""
+    if not filename:
+        return None
+
+    patterns = [
+        r'Ch(\d+)', r'Chapter(\d+)', r'CH(\d+)', 
+        r'ch(\d+)', r'Chap(\d+)', r'chap(\d+)',
+        r'Ch\.(\d+)', r'Chapter\.(\d+)', r'CH\.(\d+)',
+        r'ch\.(\d+)', r'Chap\.(\d+)', r'chap\.(\d+)',
+        r'Ch-(\d+)', r'Chapter-(\d+)', r'CH-(\d+)',
+        r'ch-(\d+)', r'Chap-(\d+)', r'chap-(\d+)',
+        r'CH-(\d+)', r'CHAP-(\d+)', r'CHAPTER (\d+)',
+        r'Ch (\d+)', r'Chapter (\d+)', r'CH (\d+)',
+        r'ch (\d+)', r'Chap (\d+)', r'chap (\d+)',
+        r'\[Ch(\d+)\]', r'\[Chapter(\d+)\]', r'\[CH(\d+)\]',
+        r'\[ch(\d+)\]', r'\[Chap(\d+)\]', r'\[chap(\d+)\]',
+        r'\[C(\d+)\]'
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, filename, re.IGNORECASE)
+        if match:
+            return match.group(1).zfill(2)
+    
+    return None
+
+def extract_volume(filename):
+    """Extract volume number from filename"""
+    if not filename:
+        return None
+
+    patterns = [
+        r'\[V(?:ol(?:ume)?)?[._ -]?(\d+)\]',
+        r'V(?:ol(?:ume)?)?[._ -]?(\d+)',
+        r'\bvol(?:ume)?[._ -]?(\d+)\b',
+        r'\bvol(?:ume)?\s*(\d+)\b',
+        r'\(vol(?:ume)?[._ -]?(\d+)\)',
+        r'\bV\s*[\.:_-]?\s*(\d+)\b',
+        r'\bVol\s*[\.:_-]?\s*(\d+)\b',
+        r'\bVolume\s*[\.:_-]?\s*(\d+)\b'
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, filename, re.IGNORECASE)
+        if match:
+            return match.group(1).zfill(2)
+
+    return None
+
+async def detect_audio_info(file_path):
+    """Detect audio streams information using FFprobe"""
+    ffprobe = shutil.which('ffprobe')
+    if not ffprobe:
+        raise RuntimeError("ffprobe not found in PATH")
+
+    cmd = [
+        ffprobe,
+        '-v', 'quiet',
+        '-print_format', 'json',
+        '-show_streams',
+        file_path
+    ]
+
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await process.communicate()
 
     try:
-        ffmpeg = shutil.which('ffmpeg')
-        if not ffmpeg:
-            await status.edit("**Uᴘsᴄᴀʟɪɴɢ ꜰᴀɪʟᴇᴅ﹕ FFᴍᴘᴇɢ ɴᴏᴛ ꜰᴏᴜɴᴅ ᴏɴ sᴇʀᴠᴇʀ.**")
-            return
+        info = json.loads(stdout)
+        streams = info.get('streams', [])
+        
+        audio_streams = [s for s in streams if s.get('codec_type') == 'audio']
+        sub_streams = [s for s in streams if s.get('codec_type') == 'subtitle']
 
-        # Get original dimensions
-        process = await asyncio.create_subprocess_exec(
-            ffmpeg, "-v", "error", "-select_streams", "v:0", "-show_entries",
-            "stream=width,height", "-of", "csv=s=x:p=0", "-i", input_path,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        stdout, _ = await process.communicate()
-        width, height = 0, 0
+        japanese_audio = 0
+        english_audio = 0
+        for audio in audio_streams:
+            lang = audio.get('tags', {}).get('language', '').lower()
+            if lang in {'ja', 'jpn', 'japanese'}:
+                japanese_audio += 1
+            elif lang in {'en', 'eng', 'english'}:
+                english_audio += 1
+
+        english_subs = len([
+            s for s in sub_streams 
+            if s.get('tags', {}).get('language', '').lower() in {'en', 'eng', 'english'}
+        ])
+
+        return len(audio_streams), len(sub_streams), japanese_audio, english_audio, english_subs
+    except Exception as e:
+        logger.error(f"Audio detection error: {e}")
+        return 0, 0, 0, 0, 0
+
+def get_audio_label(audio_info):
+    """Get audio label based on audio stream information"""
+    audio_count, sub_count, jp_audio, en_audio, en_subs = audio_info
+    
+    if audio_count == 1:
+        if jp_audio >= 1 and en_subs >= 1:
+            return "Sub" + ("s" if sub_count > 1 else "")
+        if en_audio >= 1:
+            return "Dub"
+    
+    if audio_count == 2:
+        return "Dual"
+    elif audio_count == 3:
+        return "Tri"
+    elif audio_count >= 4:
+        return "Multi"
+    
+    return "Unknown"
+
+async def detect_video_resolution(file_path):
+    """Detect actual video resolution using FFmpeg"""
+    ffprobe = shutil.which('ffprobe')
+    if not ffprobe:
+        raise RuntimeError("ffprobe not found in PATH")
+
+    cmd = [
+        ffprobe,
+        '-v', 'quiet',
+        '-print_format', 'json',
+        '-show_streams',
+        '-select_streams', 'v',
+        file_path
+    ]
+
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await process.communicate()
+
+    try:
+        info = json.loads(stdout)
+        streams = info.get('streams', [])
+        
+        if not streams:
+            return "Unknown"
+            
+        video_stream = streams[0]
+        width = video_stream.get('width', 0)
+        height = video_stream.get('height', 0)
+        
+        if height >= 2160 or width >= 3840:
+            return "2160p"
+        elif height >= 1440:
+            return "1440p"
+        elif height >= 1080:
+            return "1080p"
+        elif height >= 720:
+            return "720p"
+        elif height >= 480:
+            return "480p"
+        elif height >= 360:
+            return "360p"
+        elif height >= 240:
+            return "240p"
+        elif height >= 144:
+            return "144p"
+        else:
+            return f"{height}p"
+            
+    except Exception as e:
+        logger.error(f"Resolution detection error: {e}")
+        return "Unknown"
+
+async def process_thumbnail(thumb_path):
+    """Process and resize thumbnail"""
+    if not thumb_path or not await aiofiles.os.path.exists(thumb_path):
+        return None
+    try:
+        img = await asyncio.to_thread(Image.open, thumb_path)
+        img = await asyncio.to_thread(lambda: img.convert("RGB").resize((320, 320)))
+        await asyncio.to_thread(img.save, thumb_path, "JPEG")
+        return thumb_path
+    except Exception as e:
+        logger.error(f"Thumbnail processing failed: {e}")
+        await cleanup_files(thumb_path)
+        return None
+
+async def cleanup_files(*paths):
+    """Clean up temporary files"""
+    for path in paths:
         try:
-            dims = stdout.decode().strip().split("x")
-            width, height = int(dims[0]), int(dims[1])
-        except Exception:
-            pass
+            if path and await aiofiles.os.path.exists(path):
+                await aiofiles.os.remove(path)
+        except Exception as e:
+            logger.error(f"Error removing {path}: {e}")
 
-        target_width = width * 2 if width else 0
-        target_height = height * 2 if height else 0
+async def add_metadata(input_path, output_path, user_id):
+    """Add metadata to media files"""
+    ffmpeg = shutil.which('ffmpeg')
+    if not ffmpeg:
+        raise RuntimeError("FFmpeg not found in PATH")
 
-        vf = (
-            f"scale={target_width}:{target_height}:flags=lanczos,"
-            "hqdn3d=3.0:3.0:8:8,"
-            "smartblur=lr=1.0:ls=-1.0:lt=0.8,"
-            "unsharp=7:7:1.0:7:7:0.0,"
-            "deband"
-        )
+    output_dir = os.path.dirname(output_path)
+    await aiofiles.os.makedirs(output_dir, exist_ok=True)
 
-        cmd = [
-            ffmpeg,
-            "-y",
-            "-i", input_path,
-            "-vf", vf,
-            output_path
-        ]
+    metadata = {
+        'title': await DARKXSIDE78.get_title(user_id),
+        'video': await DARKXSIDE78.get_video(user_id),
+        'audio': await DARKXSIDE78.get_audio(user_id),
+        'subtitle': await DARKXSIDE78.get_subtitle(user_id),
+        'artist': await DARKXSIDE78.get_artist(user_id),
+        'author': await DARKXSIDE78.get_author(user_id),
+        'encoded_by': await DARKXSIDE78.get_encoded_by(user_id),
+        'custom_tag': await DARKXSIDE78.get_custom_tag(user_id),
+        'commentz': await DARKXSIDE78.get_commentz(user_id)
+    }
+
+    cmd = [
+        ffmpeg,
+        '-hide_banner',
+        '-i', input_path,
+        '-map', '0',
+        '-c', 'copy',
+        '-metadata', f'title={metadata["title"]}',
+        '-metadata:s:v', f'title={metadata["video"]}',
+        '-metadata:s:s', f'title={metadata["subtitle"]}',
+        '-metadata:s:a', f'title={metadata["audio"]}',
+        '-metadata', f'artist={metadata["artist"]}',
+        '-metadata', f'author={metadata["author"]}',
+        '-metadata', f'encoded_by={metadata["encoded_by"]}',
+        '-metadata', f'comment={metadata["commentz"]}',
+        '-metadata', f'custom_tag={metadata["custom_tag"]}',
+        '-loglevel', 'error',
+        '-y'
+    ]
+
+    cmd += ['-f', 'matroska', output_path]
+
+    try:
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
         _, stderr = await process.communicate()
-        if process.returncode != 0 or not os.path.exists(output_path):
-            await status.edit(f"**Uᴘsᴄᴀʟɪɴɢ ꜰᴀɪʟᴇᴅ﹕** {stderr.decode().strip()}")
-            return
 
-        await client.send_photo(message.chat.id, output_path, caption="**Uᴘsᴄᴀʟᴇᴅ ɪᴍᴀɢᴇ ⁽FFmpeg AI-Like 2x, Sᴍᴏᴏᴛʜ & Dᴇɴᴏɪsᴇᴅ⁾**")
-        await status.delete()
+        if process.returncode != 0:
+            error_msg = stderr.decode().strip()
+            logger.error(f"FFmpeg error: {error_msg}")
+            
+            if await aiofiles.os.path.exists(output_path):
+                await aiofiles.os.remove(output_path)
+            
+            raise RuntimeError(f"Metadata addition failed: {error_msg}")
+
+        return output_path
+
     except Exception as e:
-        await status.edit(f"**Uᴘsᴄᴀʟɪɴɢ ꜰᴀɪʟᴇᴅ﹕** `{e}`")
-    finally:
-        for path in [input_path, output_path]:
-            if path and os.path.exists(path):
-                os.remove(path)
-                
-@Client.on_message(filters.command("admin_mode"))
-async def admin_mode(client, message):
-    global ADMIN_MODE
-    user_id = message.from_user.id
-    if user_id not in ADMINS:
-        return await message.reply("Aᴅᴍɪɴ ᴏɴʟʏ ᴄᴏᴍᴍᴀɴᴅ!")
-    
-    args = message.text.split()
-    if len(args) < 2:
-        mode = "on" if ADMIN_MODE else "off"
-        return await message.reply(f"Aᴅᴍɪɴ Mᴏᴅᴇ ɪs ᴄᴜʀʀᴇɴᴛʟʏ {mode}")
-    
-    if args[1].lower() in ("on", "yes", "true"):
-        ADMIN_MODE = True
-        await message.reply("Aᴅᴍɪɴ Mᴏᴅᴇ ᴇɴᴀʙʟᴇᴅ - Oɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜᴇ ʙᴏᴛ")
-    else:
-        ADMIN_MODE = False
-        await message.reply("Aᴅᴍɪɴ Mᴏᴅᴇ ᴅɪsᴀʙʟᴇᴅ - Aʟʟ ᴜsᴇʀs ᴄᴀɴ ᴀᴄᴄᴇss")
+        logger.error(f"Metadata processing failed: {e}")
+        await cleanup_files(output_path)
+        raise
 
-@Client.on_message(filters.command("add_admin"))
-async def add_admin(client, message):
-    if message.from_user.id not in ADMINS:
-        return
-    
-    try:
-        target = message.text.split()[1]
-        if target.startswith("@"):
-            user = await client.get_users(target)
-            ADMINS.add(user.id)
-        else:
-            ADMINS.add(int(target))
-        await message.reply(f"Aᴅᴅᴇᴅ ᴀᴅᴍɪɴ: {target}")
-    except Exception as e:
-        await message.reply(f"Eʀʀᴏʀ: {str(e)}")
+async def convert_to_mkv(input_path, output_path):
+    """Convert video file to MKV format"""
+    ffmpeg = shutil.which('ffmpeg')
+    if not ffmpeg:
+        raise RuntimeError("FFmpeg not found in PATH")
 
+    cmd = [
+        ffmpeg,
+        '-hide_banner',
+        '-i', input_path,
+        '-map', '0',
+        '-c', 'copy',
+        '-f', 'matroska',
+        '-y',
+        output_path
+    ]
+
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    _, stderr = await process.communicate()
+
+    if process.returncode != 0:
+        error_msg = stderr.decode().strip()
+        raise RuntimeError(f"MKV conversion failed: {error_msg}")
+    
+    return output_path
+
+# Task Queue Implementation
 class TaskQueue:
     def __init__(self):
-        self.queues: Dict[int, Deque[Tuple[str, Message, asyncio.coroutine]]] = {}
+        self.queues: Dict[int, Deque[Tuple[str, Message, asyncio.coroutine]] = {}
         self.processing: Dict[int, Set[str]] = {}
         self.tasks: Dict[str, asyncio.Task] = {}
         self.max_retries = 3
@@ -555,8 +680,10 @@ class TaskQueue:
             
             return canceled
 
+# Initialize task queue
 task_queue = TaskQueue()
 
+# Message Handlers
 @Client.on_message((filters.group | filters.private) & filters.command("queue"))
 @check_ban_status
 async def queue_status(client, message: Message):
@@ -581,20 +708,6 @@ async def cancel_queue(client, message: Message):
         await message.reply_text(f"**Cᴀɴᴄᴇʟᴇᴅ {canceled} ǫᴜᴇᴜᴇᴅ ᴛᴀsᴋs!**")
     else:
         await message.reply_text("**Nᴏ ᴛᴀsᴋs ɪɴ ǫᴜᴇᴜᴇ ᴛᴏ ᴄᴀɴᴄᴇʟ.**")
-
-def detect_quality(file_name):
-    quality_order = {
-        "144p": 1,
-        "240p": 2,
-        "360p": 3,
-        "480p": 4,
-        "720p": 5, 
-        "1080p": 6,
-        "1440p": 7,
-        "2160p": 8
-        }
-    match = re.search(r"(144p|240p|360p|480p|720p|1080p|1440p|2160p)", file_name)
-    return quality_order.get(match.group(1), 8) if match else 9
 
 @Client.on_message(filters.command("ssequence") & filters.private)
 @check_ban_status
@@ -627,28 +740,6 @@ async def end_sequence(client, message: Message):
     if not file_list:
         return await message.reply_text("**Nᴏ ғɪʟᴇs ʀᴇᴄᴇɪᴠᴇᴅ ɪɴ ᴛʜɪs sᴇǫᴜᴇɴᴄᴇ!**")
 
-    quality_order = {
-        "144p": 1, "240p": 2, "360p": 3, "480p": 4,
-        "720p": 5, "1080p": 6, "1440p": 7, "2160p": 8
-    }
-
-    def extract_quality(filename):
-        filename = filename.lower()
-        patterns = [
-            (r'2160p|4k', '2160p'),
-            (r'1440p|2k', '1440p'),
-            (r'1080p|fhd', '1080p'),
-            (r'720p|hd', '720p'),
-            (r'480p|sd', '480p'),
-            (r'(\d{3,4})p', lambda m: f"{m.group(1)}p")
-        ]
-        
-        for pattern, value in patterns:
-            match = re.search(pattern, filename)
-            if match:
-                return value if isinstance(value, str) else value(match)
-        return "unknown"
-
     def sorting_key(f):
         filename = f["file_name"].lower()
         
@@ -662,7 +753,10 @@ async def end_sequence(client, message: Message):
             episode = int(episode_match.group(1))
             
         quality = extract_quality(filename)
-        quality_priority = quality_order.get(quality.lower(), 9)
+        quality_priority = {
+            "144p": 1, "240p": 2, "360p": 3, "480p": 4,
+            "720p": 5, "1080p": 6, "1440p": 7, "2160p": 8
+        }.get(quality.lower(), 9)
         
         padded_episode = f"{episode:04d}"
         
@@ -728,591 +822,6 @@ async def end_sequence(client, message: Message):
         logger.error(f"Sequence processing failed: {e}")
         await message.reply_text("**Fᴀɪʟᴇᴅ ᴛᴏ ᴘʀᴏᴄᴇss sᴇǫᴜᴇɴᴄᴇ! Cʜᴇᴄᴋ ʟᴏɢs ғᴏʀ ᴅᴇᴛᴀɪʟs.**")
 
-@Client.on_message(filters.command("token_usage") & filters.private)
-@check_ban_status
-async def global_premium_control(client, message: Message):
-    global PREMIUM_MODE, PREMIUM_MODE_EXPIRY
-
-    user_id = message.from_user.id
-    if user_id not in Config.ADMIN:
-        return await message.reply_text("**Tʜɪs ᴄᴏᴍᴍᴀɴᴅ ɪs ʀᴇsᴛʀɪᴄᴛᴇᴅ ᴛᴏ ᴀᴅᴍɪɴs ᴏɴʟʏ!!!**")
-
-    args = message.command[1:]
-    if not args:
-        status = "ON" if PREMIUM_MODE else "OFF"
-        expiry = f" (expires {PREMIUM_MODE_EXPIRY:%Y-%m-%d %H:%M})" if isinstance(PREMIUM_MODE_EXPIRY, datetime) else  ""
-        return await message.reply_text(
-            f"**➠ Cᴜʀʀᴇɴᴛ Tᴏᴋᴇɴ Usᴀɢᴇ: {status}{expiry}**\n\n"
-            "**Usᴀɢᴇ:**\n"
-            "`/token_usage on [days|12m|1y]`  — Eɴᴀʙʟᴇ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ\n"
-            "`/token_usage off [days|12m|1y]` — Dɪsᴀʙʟᴇ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ"
-        )
-
-    action = args[0].lower()
-    if action not in ("on", "off"):
-        return await message.reply_text("**Iɴᴠᴀʟɪᴅ ᴀᴄᴛɪᴏɴ! Usᴇ `on` ᴏʀ `off`**")
-
-    days = None
-    if len(args) > 1:
-        days = parse_duration(args[1])
-        if days is None:
-            return await message.reply_text("**Iɴᴠᴀʟɪᴅ ᴅᴜʀᴀᴛɪᴏɴ! Usᴇ 12m, 1y, 30d, 7day, etc.**")
-
-    if action == "on":
-        PREMIUM_MODE = True
-        PREMIUM_MODE_EXPIRY = datetime.now() + timedelta(days=days) if days else None
-        msg = f"**Tᴏᴋᴇɴ ᴜsᴀɢᴇ ʜᴀs ʙᴇᴇɴ ᴇɴᴀʙʟᴇᴅ{f' ғᴏʀ {days} ᴅᴀʏs' if days else ''}**"
-    else:
-        PREMIUM_MODE = False
-        PREMIUM_MODE_EXPIRY = datetime.now() + timedelta(days=days) if days else None
-        msg = f"**Tᴏᴋᴇɴ ᴜsᴀɢᴇ ʜᴀs ʙᴇᴇɴ ᴅɪsᴀʙʟᴇᴅ{f' ғᴏʀ {days} ᴅᴀʏs' if days else ''}**"
-
-    await DARKXSIDE78.global_settings.update_one(
-        {"_id": "premium_mode"},
-        {"$set": {"status": PREMIUM_MODE, "expiry": PREMIUM_MODE_EXPIRY}},
-        upsert=True
-    )
-    await message.reply_text(msg)
-
-async def check_premium_mode():
-    global PREMIUM_MODE, PREMIUM_MODE_EXPIRY
-
-    settings = await DARKXSIDE78.global_settings.find_one({"_id": "premium_mode"})
-    if not settings:
-        return
-
-    PREMIUM_MODE        = settings.get("status", True)
-    PREMIUM_MODE_EXPIRY = settings.get("expiry", None)
-
-    if PREMIUM_MODE_EXPIRY and isinstance(PREMIUM_MODE_EXPIRY, datetime) and datetime.now() > PREMIUM_MODE_EXPIRY:
-        PREMIUM_MODE = False  # Changed to disable premium mode on expiry
-        PREMIUM_MODE_EXPIRY = None
-        await DARKXSIDE78.global_settings.update_one(
-            {"_id": "premium_mode"},
-            {"$set": {"status": PREMIUM_MODE, "expiry": PREMIUM_MODE_EXPIRY}}
-
-        )
-
-
-SEASON_EPISODE_PATTERNS = [
-    (re.compile(r'\[S(\d{1,2})[\s\-]+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),   # [S01-E06]
-    (re.compile(r'\[S(\d{1,2})[\s\-]+(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),     # [S01-06]
-    (re.compile(r'\[S(\d{1,2})\s+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),        # [S01 E06]
-    (re.compile(r'\[S\s*(\d{1,2})\s*E\s*(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')), # [S 1 E 1]
-    (re.compile(r'S(\d{1,2})[\s\-]+E(\d{1,3})', re.IGNORECASE), ('season', 'episode')),        # S01-E06, S01 E06
-    (re.compile(r'S(\d{1,2})[\s\-]+(\d{1,3})', re.IGNORECASE), ('season', 'episode')),         # S01-06, S01 06
-    (re.compile(r'S(\d+)(?:E|EP)(\d+)'), ('season', 'episode')),
-    (re.compile(r'S(\d+)[\s-]*(?:E|EP)(\d+)'), ('season', 'episode')),
-    (re.compile(r'Season\s*(\d+)\s*Episode\s*(\d+)', re.IGNORECASE), ('season', 'episode')),
-    (re.compile(r'\[S(\d+)\]\[E(\d+)\]'), ('season', 'episode')),
-    (re.compile(r'S(\d+)[^\d]+(\d{1,3})\b'), ('season', 'episode')),
-    (re.compile(r'(?:E|EP|Episode)\s*(\d+)', re.IGNORECASE), (None, 'episode')),
-    (re.compile(r'\b(\d{1,3})\b'), (None, 'episode'))
-]
-
-QUALITY_PATTERNS = [
-    (re.compile(r'\[(\d{3,4}p)\](?:\s*\[\1\])*', re.IGNORECASE), lambda m: m.group(1)),
-    (re.compile(r'\b(\d{3,4})p?\b'), lambda m: f"{m.group(1)}p"),
-    (re.compile(r'\b(4k|2160p)\b', re.IGNORECASE), lambda m: "2160p"),
-    (re.compile(r'\b(2k|1440p)\b', re.IGNORECASE), lambda m: "1440p"),
-    (re.compile(r'\b(\d{3,4}[pi])\b', re.IGNORECASE), lambda m: m.group(1)),
-    (re.compile(r'\b(HDRip|HDTV)\b', re.IGNORECASE), lambda m: m.group(1)),
-    # Rule 1: Preserve Sub, Dub, Dual, Multi
-    (re.compile(r'\b(Sub|Dub|Dual|Multi)\b', re.IGNORECASE), lambda m: m.group(1)),
-    
-    # Rule 2: Remove mentions like @Uploader
-    (re.compile(r'@\w+'), lambda m: ""),
-
-    (re.compile(r'\b(4kX264|4kx265)\b', re.IGNORECASE), lambda m: m.group(1)),
-    (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1))
-]
-# Add these patterns at the top of your code with other constants
-TITLE_CLEANING_PATTERNS = [
-    re.compile(p, re.IGNORECASE) for p in [
-        r'@\w+',
-        r'\[?S\d{1,2}[\s\-]*E\d{1,3}\]?', r'Season\s*\d{1,2}', r'Episode\s*\d{1,3}',
-        r'\d{1,2}x\d{1,3}', r'EP?\d{1,3}', r'\[\d{1,3}\]',
-        r'\[\d{3,4}[pi]\]', r'\d{3,4}p', r'4[kK]', r'2[kK]', 
-        r'HDTV', r'WEB[\- ]?DL', r'WEB[\- ]?Rip', r'Blu[\- ]?Ray',
-        r'x\d{3,4}', r'HDR', r'DTS', r'AAC', r'AC3',
-        r'\[(Sub|Dub|Dual Audio)\]', r'\[(Tam|Tel|Hin|Mal|Kan|Eng|Jpn)\]',
-        r'\[.*?\]', r'\(.*?\)', r'v\d', r'[\-_]', r'\d+MB', r'\d+GB',
-        r'\.\w{2,4}$', r'\d+p', r'x\d{3,4}'
-    ]
-]
-
-COMMON_WORDS_TO_REMOVE = [
-    'complete', 'full', 'uncut', 'remastered', 'extended',
-    'dual', 'multi', 'proper', 'repack', 'rerip',
-    'limited', 'special edition', 'directors cut',
-    'webdl', 'webrip', 'bluray', 'bdrip', 'brrip',
-    'dvdrip', 'hdtv', 'hdr', 'uhd', '4k', '1080p', '720p'
-]
-
-def clean_title(raw_title):
-    """Clean and format the extracted title"""
-    if not raw_title:
-        return "Unknown"
-    
-    # Ensure raw_title is a string
-    if isinstance(raw_title, (tuple, list)):
-        raw_title = " ".join(str(x) for x in raw_title)
-    elif not isinstance(raw_title, str):
-        raw_title = str(raw_title)
-    
-    for pattern in TITLE_CLEANING_PATTERNS:
-        raw_title = pattern.sub('', raw_title)
-
-    for word in COMMON_WORDS_TO_REMOVE:
-        raw_title = re.sub(rf'\b{re.escape(word)}\b', '', raw_title, flags=re.IGNORECASE)
-    
-    raw_title = re.sub(r'[^\w\s]', ' ', raw_title)
-    raw_title = re.sub(r'\s+', ' ', raw_title).strip()
-    
-    return format_title_case(raw_title) if raw_title else "Unknown"
-
-    return format_title_case(title)
-
-def format_title_case(title):
-    """Properly format title case with exceptions"""
-    if not title:
-        return ""
-    
-    lowercase_words = {
-        'a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on',
-        'at', 'to', 'from', 'by', 'of', 'in', 'with', 'as', 'is'
-    }
-    
-    words = title.split()
-    if not words:
-        return ""
-    
-    formatted_words = []
-    for i, word in enumerate(words):
-        if i > 0 and word.lower() in lowercase_words:
-            formatted_words.append(word.lower())
-        else:
-            if "'" in word:
-                parts = word.split("'")
-                formatted = []
-                for part in parts:
-                    if part:
-                        formatted.append(part[0].upper() + part[1:].lower())
-                    else:
-                        formatted.append("'")
-                formatted_words.append("'".join(formatted))
-            else:
-                formatted_words.append(word[0].upper() + word[1:].lower())
-    
-    return ' '.join(formatted_words)
-def extract_title_from_filename(filename):
-    """Enhanced filename parser with better anime support"""
-    if not filename:
-        return "Unknown"
-    
-    # Ensure filename is a string (in case a tuple is passed)
-    if isinstance(filename, (tuple, list)):
-        filename = " ".join(str(x) for x in filename)
-    elif not isinstance(filename, str):
-        filename = str(filename)
-    
-    # Remove file extension and clean filename
-    filename = re.sub(r'\.[^\.]+$', '', filename)
-    filename = re.sub(r'\[.*?\]', ' ', filename)  # Remove all bracket contents first
-    filename = re.sub(r'@\w+', '', filename)      # Remove uploader tags
-    filename = re.sub(r'[\(\)]', ' ', filename)   # Replace parentheses with spaces
-    
-    # -------------------------
-    # 1. Anime-specific patterns (priority)
-    # -------------------------
-    anime_patterns = [
-        r'(?:\[.*?\])?\s*(.*?)\s*[Ss](\d+)[\s\-_]*[Ee](\d+)\b',
-        r'(.*?)\s*[\-\s_](\d+)x(\d+)\b',
-        r'[Ss](\d+)[\s\-_]*[Ee](\d+)[\s\-_]*(.*?)(?:\s+\[|\s+\d{3,4}p|$)',
-        r'(.*?)\s*[Ss](\d+)[\s\-_]*[Ee](\d+)\b',
-        r'\[?[Ss](\d{1,2})[-_](\d{2})\]?\s*(.*?)(?:\s+\[|\s+\d{3,4}p|$)',
-        r'[Ss](\d{1,2})[_\-]?[Ee](\d{1,2})[_\-]+([A-Za-z0-9:_\-\s]+?)(?=[_\-]+\d{3,4}p|[_\-]+Sub|[_\-]+Dub|$)'
-    ]
-
-    
-    for pattern in anime_patterns:
-        match = re.search(pattern, filename, re.IGNORECASE)
-        if match:
-            title = match.group(1) if 'x' in pattern else match.group(3) if match.lastindex >= 3 else match.group(0)
-            title = re.sub(r'[\-\_]', ' ', title).strip()
-            if title and title != "Unknown":
-                return format_title_case(title)
-
-    # -------------------------
-    # 2. Enhanced bracket-based extraction
-    # -------------------------
-    bracket_match = re.search(r'\]\s*([^\[\]]+?)\s*(?:\d{3,4}p|\[|$)', filename)
-    if bracket_match:
-        potential_title = bracket_match.group(1).strip()
-        if len(potential_title.split()) > 1:
-            return clean_title(potential_title)
-
-    # -------------------------
-    # 3. Quality-based separation
-    # -------------------------
-    quality_match = re.search(r'(.*?)\s*(?:\d{3,4}p|WEB|BluRay|HDRip)', filename, re.IGNORECASE)
-    if quality_match:
-        potential_title = quality_match.group(1).strip()
-        if potential_title:
-            return clean_title(potential_title)
-
-    # -------------------------
-    # 4. Fallback patterns
-    # -------------------------
-    fallback_patterns = [
-        r'^(.*?)(?:\s+-\s+\d+|$)',      # Before episode number
-        r'^(.*?)(?:\s+\(\d{4}\)|$)',    # Before year
-        r'^(.*?)(?:\s+\d{3,4}p|$)',     # Before quality
-        r'^(.*?)(?:\s+[Ss]\d|$)'        # Before season
-    ]
-    
-    for pattern in fallback_patterns:
-        match = re.search(pattern, filename)
-        if match:
-            potential_title = match.group(1).strip()
-            if potential_title:
-                return clean_title(potential_title)
-
-    # Final cleanup
-    return clean_title(filename)
-
-def extract_season_episode(filename):
-    """Enhanced season/episode extraction"""
-    # Try anime patterns first
-    anime_patterns = [
-        (r'\[S(\d+)-(\d+)\]', ('season', 'episode')),          # [S01-03]
-        (r'[Ss](\d+)[\s\-_]*[Ee](\d+)', ('season', 'episode')), # S01E03
-        (r'(\d+)x(\d+)', ('season', 'episode')),               # 01x03
-        (r'(\d+)[\s\-_](\d+)', ('season', 'episode')),         # 01 03 or 01-03
-        (r'EP?(\d+)', (None, 'episode'))                       # EP03 or E03
-    ]
-    
-    for pattern, groups in anime_patterns:
-        match = re.search(pattern, filename)
-        if match:
-            season = match.group(1).zfill(2) if groups[0] else "01"
-            episode = match.group(2 if groups[0] else 1).zfill(2)
-            return season, episode
-    
-    # Fallback to standard patterns
-    return "01", "01"
-
-def extract_quality(filename):
-    """Enhanced quality detection"""
-    quality_map = {
-        r'\b2160p\b': '4K',
-        r'\b4k\b': '4K',
-        r'\b1080p\b': '1080p',
-        r'\b720p\b': '720p',
-        r'\b480p\b': '480p',
-        r'\bHDTV\b': 'HDTV',
-        r'\bWEB-?DL\b': 'WEB-DL',
-        r'\bBlu-?Ray\b': 'BluRay',
-        r'\bHDR\b': 'HDR'
-    }
-    
-    qualities = []
-    for pattern, quality in quality_map.items():
-        if re.search(pattern, filename, re.IGNORECASE):
-            qualities.append(quality)
-    
-    return " ".join(qualities) if qualities else ""
-async def detect_audio_info(file_path):
-    ffprobe = shutil.which('ffprobe')
-    if not ffprobe:
-        raise RuntimeError("ffprobe not found in PATH")
-
-    cmd = [
-        ffprobe,
-        '-v', 'quiet',
-        '-print_format', 'json',
-        '-show_streams',
-        file_path
-    ]
-
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    stdout, stderr = await process.communicate()
-
-    try:
-        info = json.loads(stdout)
-        streams = info.get('streams', [])
-        
-        audio_streams = [s for s in streams if s.get('codec_type') == 'audio']
-        sub_streams = [s for s in streams if s.get('codec_type') == 'subtitle']
-
-        japanese_audio = 0
-        english_audio = 0
-        for audio in audio_streams:
-            lang = audio.get('tags', {}).get('language', '').lower()
-            if lang in {'ja', 'jpn', 'japanese'}:
-                japanese_audio += 1
-            elif lang in {'en', 'eng', 'english'}:
-                english_audio += 1
-
-        english_subs = len([
-            s for s in sub_streams 
-            if s.get('tags', {}).get('language', '').lower() in {'en', 'eng', 'english'}
-        ])
-
-        return len(audio_streams), len(sub_streams), japanese_audio, english_audio, english_subs
-    except Exception as e:
-        logger.error(f"Audio detection error: {e}")
-        return 0, 0, 0, 0, 0
-def get_audio_label(filename, audio_info=None):
-    """Enhanced audio detection from filename and streams"""
-    audio_tags = []
-    
-    # From filename
-    if re.search(r'\bSub\b', filename, re.IGNORECASE):
-        audio_tags.append("Sub")
-    if re.search(r'\bDub\b', filename, re.IGNORECASE):
-        audio_tags.append("Dub")
-    if re.search(r'\bDual\b', filename, re.IGNORECASE):
-        audio_tags.append("Dual")
-    
-    # From audio streams if available
-    if audio_info:
-        audio_count, _, jp_audio, en_audio, en_subs = audio_info
-        if jp_audio and en_subs:
-            audio_tags.append("Sub")
-        elif en_audio:
-            audio_tags.append("Dub")
-        if audio_count >= 2:
-            audio_tags.append("Dual" if audio_count == 2 else "Multi")
-    
-    return " ".join(sorted(set(audio_tags))) if audio_tags else "Unknown"
-async def detect_video_resolution(file_path):
-    """Detect actual video resolution using FFmpeg"""
-    ffprobe = shutil.which('ffprobe')
-    if not ffprobe:
-        raise RuntimeError("ffprobe not found in PATH")
-
-    cmd = [
-        ffprobe,
-        '-v', 'quiet',
-        '-print_format', 'json',
-        '-show_streams',
-        '-select_streams', 'v',
-        file_path
-    ]
-
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    stdout, stderr = await process.communicate()
-
-    try:
-        info = json.loads(stdout)
-        streams = info.get('streams', [])
-        
-        if not streams:
-            return "Unknown"
-            
-        video_stream = streams[0]
-        width = video_stream.get('width', 0)
-        height = video_stream.get('height', 0)
-        
-        if height >= 2160 or width >= 3840:
-            return "2160p"
-        elif height >= 1440:
-            return "1440p"
-        elif height >= 1080:
-            return "1080p"
-        elif height >= 720:
-            return "720p"
-        elif height >= 480:
-            return "480p"
-        elif height >= 360:
-            return "360p"
-        elif height >= 240:
-            return "240p"
-        elif height >= 144:
-            return "144p"
-        else:
-            return f"{height}p"
-            
-    except Exception as e:
-        logger.error(f"Resolution detection error: {e}")
-        return "Unknown"
-
-async def process_thumbnail(thumb_path):
-    if not thumb_path or not await aiofiles.os.path.exists(thumb_path):
-        return None
-    try:
-        img = await asyncio.to_thread(Image.open, thumb_path)
-        img = await asyncio.to_thread(lambda: img.convert("RGB").resize((320, 320)))
-        await asyncio.to_thread(img.save, thumb_path, "JPEG")
-        return thumb_path
-    except Exception as e:
-        logger.error(f"Thumbnail processing failed: {e}")
-        await cleanup_files(thumb_path)
-        return None
-
-async def cleanup_files(*paths):
-    for path in paths:
-        try:
-            if path and await aiofiles.os.path.exists(path):
-                await aiofiles.os.remove(path)
-        except Exception as e:
-            logger.error(f"Error removing {path}: {e}")
-
-async def add_metadata(input_path, output_path, user_id):
-    ffmpeg = shutil.which('ffmpeg')
-    if not ffmpeg:
-        raise RuntimeError("FFmpeg not found in PATH")
-
-    output_dir = os.path.dirname(output_path)
-    await aiofiles.os.makedirs(output_dir, exist_ok=True)
-
-    metadata = {
-        'title': await DARKXSIDE78.get_title(user_id),
-        'video': await DARKXSIDE78.get_video(user_id),
-        'audio': await DARKXSIDE78.get_audio(user_id),
-        'subtitle': await DARKXSIDE78.get_subtitle(user_id),
-        'artist': await DARKXSIDE78.get_artist(user_id),
-        'author': await DARKXSIDE78.get_author(user_id),
-        'encoded_by': await DARKXSIDE78.get_encoded_by(user_id),
-        'custom_tag': await DARKXSIDE78.get_custom_tag(user_id),
-        'commentz': await DARKXSIDE78.get_commentz(user_id)
-    }
-
-    cmd = [
-        ffmpeg,
-        '-hide_banner',
-        '-i', input_path,
-        '-map', '0',
-        '-c', 'copy',
-        '-metadata', f'title={metadata["title"]}',
-        '-metadata:s:v', f'title={metadata["video"]}',
-        '-metadata:s:s', f'title={metadata["subtitle"]}',
-        '-metadata:s:a', f'title={metadata["audio"]}',
-        '-metadata', f'artist={metadata["artist"]}',
-        '-metadata', f'author={metadata["author"]}',
-        '-metadata', f'encoded_by={metadata["encoded_by"]}',
-        '-metadata', f'comment={metadata["commentz"]}',
-        '-metadata', f'custom_tag={metadata["custom_tag"]}',
-        '-loglevel', 'error',
-        '-y'
-    ]
-
-    cmd += ['-f', 'matroska', output_path]
-
-    try:
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        _, stderr = await process.communicate()
-
-        if process.returncode != 0:
-            error_msg = stderr.decode().strip()
-            logger.error(f"FFmpeg error: {error_msg}")
-            
-            if await aiofiles.os.path.exists(output_path):
-                await aiofiles.os.remove(output_path)
-            
-            raise RuntimeError(f"Metadata addition failed: {error_msg}")
-
-        return output_path
-
-    except Exception as e:
-        logger.error(f"Metadata processing failed: {e}")
-        await cleanup_files(output_path)
-        raise
-
-def extract_chapter(filename): 
-    """Extract chapter number from filename"""
-    if not filename:
-        return None
-
-    patterns = [
-        r'Ch(\d+)', r'Chapter(\d+)', r'CH(\d+)', 
-        r'ch(\d+)', r'Chap(\d+)', r'chap(\d+)',
-        r'Ch\.(\d+)', r'Chapter\.(\d+)', r'CH\.(\d+)',
-        r'ch\.(\d+)', r'Chap\.(\d+)', r'chap\.(\d+)',
-        r'Ch-(\d+)', r'Chapter-(\d+)', r'CH-(\d+)',
-        r'ch-(\d+)', r'Chap-(\d+)', r'chap-(\d+)',
-        r'CH-(\d+)', r'CHAP-(\d+)', r'CHAPTER (\d+)',
-        r'Ch (\d+)', r'Chapter (\d+)', r'CH (\d+)',
-        r'ch (\d+)', r'Chap (\d+)', r'chap (\d+)',
-        r'\[Ch(\d+)\]', r'\[Chapter(\d+)\]', r'\[CH(\d+)\]',
-        r'\[ch(\d+)\]', r'\[Chap(\d+)\]', r'\[chap(\d+)\]',
-        r'\[C(\d+)\]'
-    ]
-    
-    for pattern in patterns:
-        match = re.search(pattern, filename, re.IGNORECASE)
-        if match:
-            return match.group(1).zfill(2)
-    
-    return None
-
-def extract_volume(filename):
-    """Extract volume number from filename"""
-    if not filename:
-        return None
-
-    patterns = [
-        r'\[V(?:ol(?:ume)?)?[._ -]?(\d+)\]',
-        r'V(?:ol(?:ume)?)?[._ -]?(\d+)',
-        r'\bvol(?:ume)?[._ -]?(\d+)\b',
-        r'\bvol(?:ume)?\s*(\d+)\b',
-        r'\(vol(?:ume)?[._ -]?(\d+)\)',
-        r'\bV\s*[\.:_-]?\s*(\d+)\b',
-        r'\bVol\s*[\.:_-]?\s*(\d+)\b',
-        r'\bVolume\s*[\.:_-]?\s*(\d+)\b'
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, filename, re.IGNORECASE)
-        if match:
-            return match.group(1).zfill(2)
-
-    return None
-
-async def convert_to_mkv(input_path, output_path):
-    """Convert video file to MKV format"""
-    ffmpeg = shutil.which('ffmpeg')
-    if not ffmpeg:
-        raise RuntimeError("FFmpeg not found in PATH")
-
-    cmd = [
-        ffmpeg,
-        '-hide_banner',
-        '-i', input_path,
-        '-map', '0',
-        '-c', 'copy',
-        '-f', 'matroska',
-        '-y',
-        output_path
-    ]
-
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    _, stderr = await process.communicate()
-
-    if process.returncode != 0:
-        error_msg = stderr.decode().strip()
-        raise RuntimeError(f"MKV conversion failed: {error_msg}")
-    
-    return output_path
-
-# Update the auto_rename_files function to include title extraction
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
 @check_ban_status
 async def auto_rename_files(client, message: Message):
@@ -1321,10 +830,7 @@ async def auto_rename_files(client, message: Message):
 
     if ADMIN_MODE and user_id not in ADMINS:
         return await message.reply_text("Aᴅᴍɪɴ ᴍᴏᴅᴇ ɪs ᴀᴄᴛɪᴠᴇ - Oɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜɪs ʙᴏᴛ!")
-    autorename_enabled = await DARKXSIDE78.get_autorename_status(user_id)
-    if not autorename_enabled:
-        return await message.reply_text("🔕 Auto-Rename is turned OFF.\nUse /autorename_on to enable it.")
-
+    
     if message.document:
         file_id = message.document.file_id
         file_name = message.document.file_name
@@ -1342,13 +848,7 @@ async def auto_rename_files(client, message: Message):
         file_ext = None
     else:
         return await message.reply_text("**Uɴsᴜᴘᴘᴏʀᴛᴇᴅ ғɪʟᴇ ᴛʏᴘᴇ**")
-
-    # Ensure file_name is a string (add this right after the media type checks)
-    if not isinstance(file_name, str):
-        file_name = str(file_name)
-    if not file_name:  # Additional safety check
-        file_name = "unnamed_file"
-
+        
     if user_id in active_sequences:
         if message.document:
             file_id = message.document.file_id
@@ -1408,18 +908,15 @@ async def auto_rename_files(client, message: Message):
             format_template = await DARKXSIDE78.get_format_template(user_id)
             media_preference = await DARKXSIDE78.get_media_preference(user_id)
             metadata_source = await DARKXSIDE78.get_metadata_source(user_id)
-            
             if metadata_source == "caption" and message.caption:
                 source_text = message.caption
             else:
                 source_text = file_name
             
-            # Extract all metadata components
-            season, episode = extract_season_episode(source_text)
+            season, episode, title = extract_season_episode(source_text)
             chapter = extract_chapter(source_text)
             volume = extract_volume(source_text)
             quality = extract_quality(source_text)
-            title = extract_title_from_filename(source_text)
 
             if not format_template:
                 return await message.reply_text("**Aᴜᴛᴏ ʀᴇɴᴀᴍᴇ ғᴏʀᴍᴀᴛ ɴᴏᴛ sᴇᴛ\nPʟᴇᴀsᴇ sᴇᴛ ᴀ ʀᴇɴᴀᴍᴇ ғᴏʀᴍᴀᴛ ᴜsɪɴɢ /autorename**")
@@ -1431,10 +928,7 @@ async def auto_rename_files(client, message: Message):
 
             renaming_operations[file_id] = datetime.now()
             
-            msg = await message.reply_text("**Pʀᴏᴄᴇssɪɴɢ ʏᴏᴜʀ ғɪʟᴇ...**")
-            
             try:
-                
                 audio_label = ""
                 
                 if media_type == "video" and media_preference == "document":
@@ -1454,7 +948,7 @@ async def auto_rename_files(client, message: Message):
                 await aiofiles.os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
                 await aiofiles.os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-                await msg.edit("**Dᴏᴡɴʟᴏᴀᴅɪɴɢ...**")
+                msg = await message.reply_text("**Dᴏᴡɴʟᴏᴀᴅɪɴɢ...**")
                 try:
                     file_path = await client.download_media(
                         message,
@@ -1473,45 +967,48 @@ async def auto_rename_files(client, message: Message):
                 actual_resolution = await detect_video_resolution(file_path)
 
                 replacements = {
-                    '{title}': title,
-                    '{Title}': title,
-                    '{TITLE}': title.upper(),
                     '{season}': season or 'XX',
                     '{episode}': episode or 'XX',
                     '{chapter}': chapter or 'XX',
                     '{volume}': volume or 'XX',
                     '{quality}': quality,
                     '{audio}': audio_label,
+                    '{title}': title,
                     '{Season}': season or 'XX',
                     '{Episode}': episode or 'XX',
                     '{Chapter}': chapter or 'XX',
                     '{Volume}': volume or 'XX',
                     '{Quality}': quality,
                     '{Audio}': audio_label,
+                    '{Title}': title,
                     '{SEASON}': season or 'XX',
                     '{EPISODE}': episode or 'XX',
                     '{CHAPTER}': chapter or 'XX',
                     '{VOLUME}': volume or 'XX',
                     '{QUALITY}': quality,
                     '{AUDIO}': audio_label,
+                    '{TITLE}': title,
                     'Season': season or 'XX',
                     'Episode': episode or 'XX',
                     'Chapter': chapter or 'XX',
                     'Volume': volume or 'XX',
                     'Quality': quality,
                     'Audio': audio_label,
+                    'Title': title,
                     'SEASON': season or 'XX',
                     'EPISODE': episode or 'XX',
                     'CHAPTER': chapter or 'XX',
                     'VOLUME': volume or 'XX',
                     'QUALITY': quality,
                     'AUDIO': audio_label,
+                    'TITLE': title,
                     'season': season or 'XX',
                     'episode': episode or 'XX',
                     'chapter': chapter or 'XX',
                     'volume': volume or 'XX',
                     'quality': quality,
                     'audio': audio_label,
+                    'title': title,
                     '{resolution}': actual_resolution,
                     '{Resolution}': actual_resolution,
                     '{RESOLUTION}': actual_resolution,
@@ -1520,14 +1017,10 @@ async def auto_rename_files(client, message: Message):
                     'RESOLUTION': actual_resolution,
                 }
                 
-                # Apply all replacements to the format template
-                new_filename = format_template
-                for placeholder, value in replacements.items():
-                    new_filename = new_filename.replace(placeholder, value)
-                
-                new_filename = re.sub(r'[<>:"/\\|?*]', '', new_filename)  # Remove invalid filename characters
-                new_filename = re.sub(r'\s+', ' ', new_filename).strip()  # Clean up whitespace
-                
+                for ph, val in replacements.items():
+                    format_template = format_template.replace(ph, val)
+
+                new_filename = f"{format_template.format(**replacements)}{ext}"
                 new_download = os.path.join("downloads", new_filename)
                 new_metadata = os.path.join("metadata", new_filename)
                 new_output = os.path.join("processed", new_filename)
@@ -1777,7 +1270,411 @@ async def auto_rename_files(client, message: Message):
     )
     
     await task_queue.add_task(user_id, file_id, message, process_file())
+
+# PDF Related Handlers
+@Client.on_message(filters.command("pdf_replace") & filters.reply)
+@check_ban_status
+async def pdf_replace_banner(client, message: Message):
+    replied = message.reply_to_message
+    user_id = message.from_user.id
+    if not replied or not replied.document or not replied.document.file_name.lower().endswith(".pdf"):
+        return await message.reply("**Rᴇᴘʟʏ ᴛᴏ ᴀ PDF ᴡɪᴛʜ `/pdf_replace first`, `/pdf_replace last`, ᴏʀ `/pdf_replace first,last`**")
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2 or not args[1].strip():
+        return await message.reply("**Sᴘᴇᴄɪꜰʏ ᴡʜɪᴄʜ ᴘᴀɢᴇ⁽s⁾ ᴛᴏ ʀᴇᴘʟᴀᴄᴇ﹕ `/pdf_replace first`, `/pdf_replace last`, ᴏʀ `/pdf_replace first,last`**")
+    page_args = [x.strip().lower() for x in args[1].split(",") if x.strip() in ("first", "last")]
+    if not page_args:
+        return await message.reply("**Oɴʟʏ `first`, `last`, ᴏʀ ʙᴏᴛʜ ᴀʀᴇ sᴜᴘᴘᴏʀᴛᴇᴅ.**")
+    banner_file_id = await DARKXSIDE78.get_pdf_banner(user_id)
+    if not banner_file_id:
+        return await message.reply("**Yᴏᴜ ʜᴀᴠᴇ ɴᴏᴛ sᴇᴛ ᴀ PDF ʙᴀɴɴᴇʀ. Rᴇᴘʟʏ ᴛᴏ ᴀ ᴘʜᴏᴛᴏ ᴡɪᴛʜ `/set_pdf_banner` ꜰɪʀsᴛ.**")
+    processing_msg = await message.reply("**Pʀᴏᴄᴇssɪɴɢ, ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ ᴀ ꜰᴇᴡ ᴍᴏᴍᴇɴᴛs...**")
+    input_path = await replied.download()
+    output_path = input_path
+    temp_banner_path = input_path + "_banner.jpg"
+    try:
+        await client.download_media(banner_file_id, file_name=temp_banner_path)
+        reader = PdfReader(input_path)
+        writer = PdfWriter()
+        num_pages = len(reader.pages)
+        img = Image.open(temp_banner_path).convert("RGB")
+        img = img.resize((800, 1131))
+        img_pdf_path = temp_banner_path + ".pdf"
+        img_reader = PdfReader(img_pdf_path)
+        img_page = img_reader.pages[0]
+        indices = set()
+        if "first" in page_args:
+            indices.add(0)
+        if "last" in page_args:
+            indices.add(num_pages - 1)
+        for i, page in enumerate(reader.pages):
+            if i in indices:
+                writer.add_page(img_page)
+            else:
+                writer.add_page(page)
+        with open(output_path, "wb") as f:
+            writer.write(f)
+        thumb = await DARKXSIDE78.get_thumbnail(message.chat.id)
+        thumb_path = None
+        if thumb:
+            thumb_path = await client.download_media(thumb)
+        await client.send_document(
+            message.chat.id,
+            output_path,
+            caption=f"**Rᴇᴘʟᴀᴄᴇᴅ ᴘᴀɢᴇs﹕ {', '.join(page_args)} ᴡɪᴛʜ ʏᴏᴜʀ ʙᴀɴɴᴇʀ.**",
+            thumb=thumb_path if thumb_path else None
+        )
+        if thumb_path:
+            os.remove(thumb_path)
+        await processing_msg.delete()
+    except Exception as e:
+        await processing_msg.delete()
+        await message.reply(f"**Fᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴘʟᴀᴄᴇ ᴘᴀɢᴇs﹕** `{e}`")
+    finally:
+        for path in [input_path, output_path, temp_banner_path, temp_banner_path + ".pdf"]:
+            if os.path.exists(path):
+                os.remove(path)
+
+@Client.on_message(filters.command("pdf_extractor") & filters.reply)
+@check_ban_status
+async def pdf_extractor_first_last(client, message: Message):
+    replied = message.reply_to_message
+    if not replied or not replied.document or not replied.document.file_name.lower().endswith(".pdf"):
+        return await message.reply("**Rᴇᴘʟʏ ᴛᴏ ᴀ PDF ꜰɪʟᴇ ᴡɪᴛʜ `/pdf_extractor`**")
+    processing_msg = await message.reply("**Pʀᴏᴄᴇssɪɴɢ, ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ ᴀ ꜰᴇᴡ ᴍᴏᴍᴇɴᴛs...**")
+    input_path = await replied.download()
+    first_img_path = None
+    last_img_path = None
+    try:
+        reader = PdfReader(input_path)
+        num_pages = len(reader.pages)
+        first_img = convert_from_path(input_path, first_page=1, last_page=1)[0]
+        last_img = convert_from_path(input_path, first_page=num_pages, last_page=num_pages)[0]
+        first_img_path = input_path.replace(".pdf", "_first.jpg")
+        last_img_path = input_path.replace(".pdf", "_last.jpg")
+        first_img.save(first_img_path, "JPEG")
+        last_img.save(last_img_path, "JPEG")
+        await client.send_photo(message.chat.id, first_img_path, caption="**Fɪʀsᴛ ᴘᴀɢᴇ ᴀs ɪᴍᴀɢᴇ**")
+        await client.send_photo(message.chat.id, last_img_path, caption="**Lᴀsᴛ ᴘᴀɢᴇ ᴀs ɪᴍᴀɢᴇ**")
+        await processing_msg.delete()
+    except Exception as e:
+        await processing_msg.delete()
+        await message.reply(f"**Fᴀɪʟᴇᴅ ᴛᴏ ᴇxᴛʀᴀᴄᴛ ᴘᴀɢᴇs﹕** `{e}`")
+    finally:
+        if os.path.exists(input_path):
+            os.remove(input_path)
+        if first_img_path and os.path.exists(first_img_path):
+            os.remove(first_img_path)
+        if last_img_path and os.path.exists(last_img_path):
+            os.remove(last_img_path)
+
+@Client.on_message(filters.command("pdf_add") & filters.reply)
+@check_ban_status
+async def pdf_add_banner(client, message: Message):
+    replied = message.reply_to_message
+    user_id = message.from_user.id
+    if not replied or not replied.document or not replied.document.file_name.lower().endswith(".pdf"):
+        return await message.reply("**Rᴇᴘʟʏ ᴛᴏ ᴀ PDF ᴡɪᴛʜ `/pdf_add first`, `/pdf_add last`, ᴏʀ `/pdf_add first,last`**")
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2 or not args[1].strip():
+        return await message.reply("**Sᴘᴇᴄɪꜰʏ ᴡʜᴇʀᴇ ᴛᴏ ᴀᴅᴅ﹕ `/pdf_add first`, `/pdf_add last`, ᴏʀ `/pdf_add first,last`**")
+    page_args = [x.strip().lower() for x in args[1].split(",") if x.strip() in ("first", "last")]
+    if not page_args:
+        return await message.reply("**Oɴʟʏ `first`, `last`, ᴏʀ ʙᴏᴛʜ ᴀʀᴇ sᴜᴘᴘᴏʀᴛᴇᴅ.**")
+    banner_file_id = await DARKXSIDE78.get_pdf_banner(user_id)
+    if not banner_file_id:
+        return await message.reply("**Yᴏᴜ ʜᴀᴠᴇ ɴᴏᴛ sᴇᴛ ᴀ PDF ʙᴀɴɴᴇʀ. Rᴇᴘʟʏ ᴛᴏ ᴀ ᴘʜᴏᴛᴏ ᴡɪᴛʜ `/set_pdf_banner` ꜰɪʀsᴛ.**")
+    processing_msg = await message.reply("**Pʀᴏᴄᴇssɪɴɢ, ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ ᴀ ꜰᴇᴡ ᴍᴏᴍᴇɴᴛs...**")
+    input_path = await replied.download()
+    output_path = input_path
+    temp_banner_path = input_path + "_banner.jpg"
+    try:
+        await client.download_media(banner_file_id, file_name=temp_banner_path)
+        reader = PdfReader(input_path)
+        writer = PdfWriter()
+        num_pages = len(reader.pages)
+        img = Image.open(temp_banner_path).convert("RGB")
+        img_pdf_path = temp_banner_path + ".pdf"
+        img.save(img_pdf_path, "PDF")
+        img_reader = PdfReader(img_pdf_path)
+        img_page = img_reader.pages[0]
+        if "first" in page_args:
+            writer.add_page(img_page)
+        for page in reader.pages:
+            writer.add_page(page)
+        if "last" in page_args:
+            writer.add_page(img_page)
+        with open(output_path, "wb") as f:
+            writer.write(f)
+        thumb = await DARKXSIDE78.get_thumbnail(message.chat.id)
+        thumb_path = None
+        if thumb:
+            thumb_path = await client.download_media(thumb)
+        await client.send_document(
+            message.chat.id,
+            output_path,
+            caption=f"**Aᴅᴅᴇᴅ ʙᴀɴɴᴇʀ ᴘᴀɢᴇ(s): {', '.join(page_args)}**",
+            thumb=thumb_path if thumb_path else None
+        )
+        if thumb_path:
+            os.remove(thumb_path)
+        await processing_msg.delete()
+    except Exception as e:
+        await processing_msg.delete()
+        await message.reply(f"**Fᴀɪʟᴇᴅ ᴛᴏ ᴀᴅᴅ ʙᴀɴɴᴇʀ ᴘᴀɢᴇ⁽s⁾﹕** `{e}`")
+    finally:
+        for path in [input_path, output_path, temp_banner_path, temp_banner_path + ".pdf"]:
+            if os.path.exists(path):
+                os.remove(path)
+
+@Client.on_message(filters.command("set_pdf_lock"))
+@check_ban_status
+async def set_pdf_lock_cmd(client, message: Message):
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2 or not args[1].strip():
+        return await message.reply("** Usᴀɢᴇ﹕** `/set_pdf_lock yourpassword`")
+    password = args[1].strip()
+    await DARKXSIDE78.set_pdf_lock_password(message.from_user.id, password)
+    await message.reply("**Dᴇꜰᴀᴜʟᴛ PDF ʟᴏᴄᴋ ᴘᴀssᴡᴏʀᴅ sᴇᴛ﹗ Nᴏᴡ ʏᴏᴜ ᴄᴀɴ ᴜsᴇ `/pdf_lock` ᴡɪᴛʜᴏᴜᴛ sᴘᴇᴄɪꜰʏɪɴɢ ᴀ ᴘᴀssᴡᴏʀᴅ.**")
+
+@Client.on_message(filters.command("pdf_lock") & filters.reply)
+@check_ban_status
+async def pdf_lock_password(client, message: Message):
+    replied = message.reply_to_message
+    if not replied or not replied.document or not replied.document.file_name.lower().endswith(".pdf"):
+        return await message.reply("**Rᴇᴘʟʏ ᴛᴏ ᴀ PDF ꜰɪʟᴇ ᴡɪᴛʜ `/pdf_lock yourpassword`**")
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2 or not args[1].strip():
+        password = await DARKXSIDE78.get_pdf_lock_password(message.from_user.id)
+        if not password:
+            return await message.reply("**Nᴏ ᴘᴀssᴡᴏʀᴅ sᴇᴛ﹗ Usᴇ `/set_pdf_lock yourpassword` ꜰɪʀsᴛ ᴏʀ `/pdf_lock yourpassword`**")
+    else:
+        password = args[1].strip()
+    input_path = await replied.download()
+    output_path = input_path.replace(".pdf", "_locked.pdf")
+    processing_msg = await message.reply("**Pʀᴏᴄᴇssɪɴɢ, ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ ᴀ ꜰᴇᴡ ᴍᴏᴍᴇɴᴛs...**")
+    try:
+        reader = PdfReader(input_path)
+        writer = PdfWriter()
+        for page in reader.pages:
+            writer.add_page(page)
+        writer.encrypt(password)
+        with open(output_path, "wb") as f:
+            writer.write(f)
+        thumb = await DARKXSIDE78.get_thumbnail(message.chat.id)
+        thumb_path = None
+        if thumb:
+            thumb_path = await client.download_media(thumb)
+        await client.send_document(
+            message.chat.id,
+            output_path,
+            caption="**Tʜᴇ PDF ʜᴀs ʙᴇᴇɴ ʟᴏᴄᴋᴇᴅ ᴡɪᴛʜ ʏᴏᴜʀ ᴘᴀssᴡᴏʀᴅ.**",
+            thumb=thumb_path if thumb_path else None
+        )
+        if thumb_path:
+            os.remove(thumb_path)
+        await processing_msg.delete()
+    except Exception as e:
+        await processing_msg.delete()
+        await message.reply(f"**Fᴀɪʟᴇᴅ ᴛᴏ ʟᴏᴄᴋ PDF﹕** `{e}`")
+    finally:
+        if os.path.exists(input_path):
+            os.remove(input_path)
+        if os.path.exists(output_path):
+            os.remove(output_path)
+
+@Client.on_message(filters.command("pdf_remove") & filters.reply)
+@check_ban_status
+async def pdf_remove_pages(client, message: Message):
+    replied = message.reply_to_message
+    if not replied or not replied.document or not replied.document.file_name.lower().endswith(".pdf"):
+        return await message.reply("**Rᴇᴘʟʏ ᴛᴏ ᴀ PDF ғɪʟᴇ ᴡɪᴛʜ /pdf_remove 1,2,3**")
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        return await message.reply("**Sᴘᴇᴄɪғʏ ᴘᴀɢᴇs ᴛᴏ ʀᴇᴍᴏᴠᴇ, ᴇ.ɢ. /pdf_remove 1,3,5**")
+    remove_pages = [int(x.strip())-1 for x in args[1].split(",") if x.strip().isdigit()]
+    input_path = await replied.download()
+    output_path = input_path.replace(".pdf", "_removed.pdf")
+    processing_msg = await message.reply("**Pʀᴏᴄᴇssɪɴɢ, ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ ᴀ ꜰᴇᴡ ᴍᴏᴍᴇɴᴛs...**")
+    try:
+        reader = PdfReader(input_path)
+        writer = PdfWriter()
+        for i, page in enumerate(reader.pages):
+            if i not in remove_pages:
+                writer.add_page(page)
+        with open(output_path, "wb") as f:
+            writer.write(f)
+        thumb = await DARKXSIDE78.get_thumbnail(message.chat.id)
+        thumb_path = None
+        if thumb:
+            thumb_path = await client.download_media(thumb)
+        await client.send_document(
+            message.chat.id,
+            output_path,
+            caption=f"**Rᴇᴍᴏᴠᴇᴅ ᴘᴀɢᴇs: {args[1]}**",
+            thumb=thumb_path if thumb_path else None
+        )
+        if thumb_path:
+            os.remove(thumb_path)
+        await processing_msg.delete()
+    except Exception as e:
+        await processing_msg.delete()
+        await message.reply(f"**Fᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴍᴏᴠᴇ ᴘᴀɢᴇs﹕** `{e}`")
+    finally:
+        if os.path.exists(input_path):
+            os.remove(input_path)
+        if os.path.exists(output_path):
+            os.remove(output_path)
+
+# Other Handlers
+@Client.on_message(filters.command("upscale_ffmpeg") & filters.reply)
+@check_ban_status
+async def ffmpeg_upscale_photo(client, message):
+    replied = message.reply_to_message
+    if not replied or not replied.photo:
+        return await message.reply("**Rᴇᴘʟʏ ᴛᴏ ᴀ ᴘʜᴏᴛᴏ ᴡɪᴛʜ /upscale_ffmpeg ᴛᴏ ᴜᴘsᴄᴀʟᴇ ɪᴛ (ʟᴏᴄᴀʟʟʏ, ɴᴏ API ɴᴇᴇᴅᴇᴅ)﹗**")
+    status = await message.reply("**Uᴘsᴄᴀʟɪɴɢ ɪᴍᴀɢᴇ ᴡɪᴛʜ FFᴍᴘᴇɢ... Pʟᴇᴀsᴇ ᴡᴀɪᴛ.**")
+    input_path = await replied.download()
+    output_path = "upscale_img.jpg"
+
+    try:
+        ffmpeg = shutil.which('ffmpeg')
+        if not ffmpeg:
+            await status.edit("**Uᴘsᴄᴀʟɪɴɢ ꜰᴀɪʟᴇᴅ﹕ FFᴍᴘᴇɢ ɴᴏᴛ ꜰᴏᴜɴᴅ ᴏɴ sᴇʀᴠᴇʀ.**")
+            return
+
+        process = await asyncio.create_subprocess_exec(
+            ffmpeg, "-v", "error", "-select_streams", "v:0", "-show_entries",
+            "stream=width,height", "-of", "csv=s=x:p=0", "-i", input_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await process.communicate()
+        width, height = 0, 0
+        try:
+            dims = stdout.decode().strip().split("x")
+            width, height = int(dims[0]), int(dims[1])
+        except Exception:
+            pass
+
+        target_width = width * 2 if width else 0
+        target_height = height * 2 if height else 0
+
+        vf = (
+            f"scale={target_width}:{target_height}:flags=lanczos,"
+            "hqdn3d=3.0:3.0:8:8,"
+            "smartblur=lr=1.0:ls=-1.0:lt=0.8,"
+            "unsharp=7:7:1.0:7:7:0.0,"
+            "deband"
+        )
+
+        cmd = [
+            ffmpeg,
+            '-y',
+            '-i', input_path,
+            '-vf', vf,
+            output_path
+        ]
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        _, stderr = await process.communicate()
+        if process.returncode != 0 or not os.path.exists(output_path):
+            await status.edit(f"**Uᴘsᴄᴀʟɪɴɢ ꜰᴀɪʟᴇᴅ﹕** {stderr.decode().strip()}")
+            return
+
+        await client.send_photo(message.chat.id, output_path, caption="**Uᴘsᴄᴀʟᴇᴅ ɪᴍᴀɢᴇ ⁽FFmpeg AI-Like 2x, Sᴍᴏᴏᴛʜ & Dᴇɴᴏɪsᴇᴅ⁾**")
+        await status.delete()
+    except Exception as e:
+        await status.edit(f"**Uᴘsᴄᴀʟɪɴɢ ꜰᴀɪʟᴇᴅ﹕** `{e}`")
+    finally:
+        for path in [input_path, output_path]:
+            if path and os.path.exists(path):
+                os.remove(path)
+
+@Client.on_message(filters.command("admin_mode"))
+async def admin_mode(client, message):
+    global ADMIN_MODE
+    user_id = message.from_user.id
+    if user_id not in ADMINS:
+        return await message.reply("Aᴅᴍɪɴ ᴏɴʟʏ ᴄᴏᴍᴍᴀɴᴅ!")
     
+    args = message.text.split()
+    if len(args) < 2:
+        mode = "on" if ADMIN_MODE else "off"
+        return await message.reply(f"Aᴅᴍɪɴ Mᴏᴅᴇ ɪs ᴄᴜʀʀᴇɴᴛʟʏ {mode}")
+    
+    if args[1].lower() in ("on", "yes", "true"):
+        ADMIN_MODE = True
+        await message.reply("Aᴅᴍɪɴ Mᴏᴅᴇ ᴇɴᴀʙʟᴇᴅ - Oɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜᴇ ʙᴏᴛ")
+    else:
+        ADMIN_MODE = False
+        await message.reply("Aᴅᴍɪɴ Mᴏᴅᴇ ᴅɪsᴀʙʟᴇᴅ - Aʟʟ ᴜsᴇʀs ᴄᴀɴ ᴀᴄᴄᴇss")
+
+@Client.on_message(filters.command("add_admin"))
+async def add_admin(client, message):
+    if message.from_user.id not in ADMINS:
+        return
+    
+    try:
+        target = message.text.split()[1]
+        if target.startswith("@"):
+            user = await client.get_users(target)
+            ADMINS.add(user.id)
+        else:
+            ADMINS.add(int(target))
+        await message.reply(f"Aᴅᴅᴇᴅ ᴀᴅᴍɪɴ: {target}")
+    except Exception as e:
+        await message.reply(f"Eʀʀᴏʀ: {str(e)}")
+
+@Client.on_message(filters.command("token_usage") & filters.private)
+@check_ban_status
+async def global_premium_control(client, message: Message):
+    global PREMIUM_MODE, PREMIUM_MODE_EXPIRY
+
+    user_id = message.from_user.id
+    if user_id not in Config.ADMIN:
+        return await message.reply_text("**Tʜɪs ᴄᴏᴍᴍᴀɴᴅ ɪs ʀᴇsᴛʀɪᴄᴛᴇᴅ ᴛᴏ ᴀᴅᴍɪɴs ᴏɴʟʏ!!!**")
+
+    args = message.command[1:]
+    if not args:
+        status = "ON" if PREMIUM_MODE else "OFF"
+        expiry = f" (expires {PREMIUM_MODE_EXPIRY:%Y-%m-%d %H:%M})" if PREMIUM_MODE_EXPIRY else ""
+        return await message.reply_text(
+            f"**➠ Cᴜʀʀᴇɴᴛ Tᴏᴋᴇɴ Usᴀɢᴇ: {status}{expiry}**\n\n"
+            "**Usᴀɢᴇ:**\n"
+            "`/token_usage on [days|12m|1y]`  — Eɴᴀʙʟᴇ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ\n"
+            "`/token_usage off [days|12m|1y]` — Dɪsᴀʙʟᴇ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ"
+        )
+
+    action = args[0].lower()
+    if action not in ("on", "off"):
+        return await message.reply_text("**Iɴᴠᴀʟɪᴅ ᴀᴄᴛɪᴏɴ! Usᴇ `on` ᴏʀ `off`**")
+
+    days = None
+    if len(args) > 1:
+        days = parse_duration(args[1])
+        if days is None:
+            return await message.reply_text("**Iɴᴠᴀʟɪᴅ ᴅᴜʀᴀᴛɪᴏɴ! Usᴇ 12m, 1y, 30d, 7day, etc.**")
+
+    if action == "on":
+        PREMIUM_MODE = True
+        PREMIUM_MODE_EXPIRY = datetime.now() + timedelta(days=days) if days else None
+        msg = f"**Tᴏᴋᴇɴ ᴜsᴀɢᴇ ʜᴀs ʙᴇᴇɴ ᴇɴᴀʙʟᴇᴅ{f' ғᴏʀ {days} ᴅᴀʏs' if days else ''}**"
+    else:
+        PREMIUM_MODE = False
+        PREMIUM_MODE_EXPIRY = datetime.now() + timedelta(days=days) if days else None
+        msg = f"**Tᴏᴋᴇɴ ᴜsᴀɢᴇ ʜᴀs ʙᴇᴇɴ ᴅɪsᴀʙʟᴇᴅ{f' ғᴏʀ {days} ᴅᴀʏs' if days else ''}**"
+
+    await DARKXSIDE78.global_settings.update_one(
+        {"_id": "premium_mode"},
+        {"$set": {"status": PREMIUM_MODE, "expiry": PREMIUM_MODE_EXPIRY}},
+        upsert=True
+    )
+    await message.reply_text(msg)
+
 @Client.on_message(filters.command("renamed") & (filters.group | filters.private))
 @check_ban_status
 async def renamed_stats(client, message: Message):
@@ -1936,42 +1833,10 @@ async def show_stats(client, message, target_user, time_filter, is_admin, is_pre
         await error_msg.delete()
         logger.error(f"Stats error: {e}", exc_info=True)
 
-@Client.on_callback_query(filters.regex(r"^renamed_filter:"))
-async def renamed_filter_callback(client, callback_query):
-    try:
-        data_parts = callback_query.data.split(":")
-        time_filter = data_parts[1]
-        user_id = int(data_parts[2])
-        
-        requester_id = callback_query.from_user.id
-        
-        requester_data = await DARKXSIDE78.col.find_one({"_id": requester_id})
-        is_premium = requester_data.get("is_premium", False) if requester_data else False
-        is_admin = requester_id in Config.ADMIN if Config.ADMIN else False
-        
-        target_user = None
-        if user_id != requester_id:
-            if is_admin or is_premium:
-                target_user = user_id
-            else:
-                await callback_query.answer("Yᴏᴜ ᴄᴀɴɴᴏᴛ ᴠɪᴇᴡ ᴏᴛʜᴇʀ ᴜsᴇʀs' sᴛᴀᴛs!", show_alert=True)
-                return
-        
-        await show_stats(client, callback_query.message, target_user, time_filter, is_admin, is_premium, requester_id)
-        
-        await callback_query.answer()
-        
-    except Exception as e:
-        await callback_query.answer(f"Error: {str(e)}", show_alert=True)
-        logger.error(f"Callback error: {e}", exc_info=True)
-
 @Client.on_message(filters.command("info") & (filters.group | filters.private))
 @check_ban_status
 async def system_info(client, message: Message):
     try:
-        import psutil
-        from platform import python_version, system, release
-
         total_users = await DARKXSIDE78.col.count_documents({})
         active_30d = await DARKXSIDE78.col.count_documents({
             "last_active": {"$gte": datetime.now() - timedelta(days=30)}
@@ -2024,6 +1889,7 @@ async def system_info(client, message: Message):
         await message.reply_text(f"Eʀʀᴏʀ: {str(e)}")
         logger.error(f"System info error: {e}", exc_info=True)
 
+# PDF Settings Handlers
 @Client.on_message(filters.command("set_pdf_banner_place"))
 @check_ban_status
 async def set_pdf_banner_place_cmd(client, message: Message):
@@ -2139,19 +2005,6 @@ async def pdf_banner_place_choose_cb(client, callback_query):
     await pdf_mode_settings(client, callback_query.message, edit=True, user_id=owner_id)
     await callback_query.answer(f"PDF ʙᴀɴɴᴇʀ ᴘʟᴀᴄᴇᴍᴇɴᴛ sᴇᴛ ᴛᴏ {placement}!", show_alert=True)
 
-@Client.on_message(filters.command("set_pdf_banner_place"))
-@check_ban_status
-async def set_pdf_banner_place_cmd(client, message: Message):
-    args = message.text.split(maxsplit=1)
-    if len(args) < 2 or args[1].strip().lower() not in ("first", "last", "both"):
-        return await message.reply(
-            "**Usᴀɢᴇ:** `/set_pdf_banner_place first|last|both`\n"
-            "**Sᴇᴛ ᴡʜᴇʀᴇ ʏᴏᴜʀ PDF ʙᴀɴɴᴇʀ ᴡɪʟʟ ʙᴇ ᴀᴅᴅᴇᴅ ʙʏ ᴅᴇғᴀᴜʟᴛ.**"
-        )
-    placement = args[1].strip().lower()
-    await DARKXSIDE78.set_pdf_banner_placement(message.from_user.id, placement)
-    await message.reply(f"**PDF ʙᴀɴɴᴇʀ ᴘʟᴀᴄᴇᴍᴇɴᴛ sᴇᴛ ᴛᴏ:** `{placement}`")
-
 @Client.on_callback_query(filters.regex(r"^toggle_pdf_banner:(0|1)$"))
 async def toggle_pdf_banner_cb(client, callback_query):
     mode = bool(int(callback_query.matches[0].group(1)))
@@ -2176,3 +2029,41 @@ async def set_pdf_banner_cb(client, callback_query):
 async def set_pdf_lock_pw_cb(client, callback_query):
     await callback_query.answer("Sᴇɴᴅ /set_pdf_lock <password> ᴛᴏ sᴇᴛ ʏᴏᴜʀ PDF ʟᴏᴄᴋ ᴘᴀssᴡᴏʀᴅ.", show_alert=True)
 
+async def check_premium_mode():
+    global PREMIUM_MODE, PREMIUM_MODE_EXPIRY
+
+    settings = await DARKXSIDE78.global_settings.find_one({"_id": "premium_mode"})
+    if not settings:
+        return
+
+    PREMIUM_MODE        = settings.get("status", True)
+    PREMIUM_MODE_EXPIRY = settings.get("expiry", None)
+
+    if PREMIUM_MODE_EXPIRY and datetime.now() > PREMIUM_MODE_EXPIRY:
+        PREMIUM_MODE = True
+        await DARKXSIDE78.global_settings.update_one(
+            {"_id": "premium_mode"},
+            {"$set": {"status": PREMIUM_MODE}}
+        )
+
+# Initialize
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+renaming_operations = {}
+active_sequences = {}
+message_ids = {}
+flood_control = {}
+file_queues = {}
+USER_SEMAPHORES = {}
+USER_LIMITS = {}
+tasks = []
+pending_pdf_replace = {}
+pending_pdf_insert = {}
+global PREMIUM_MODE, PREMIUM_MODE_EXPIRY, ADMIN_MODE
+PREMIUM_MODE = Config.GLOBAL_TOKEN_MODE
+PREMIUM_MODE_EXPIRY = Config.GLOBAL_TOKEN_MODE
+CON_LIMIT_ADMIN = Config.ADMIN_OR_PREMIUM_TASK_LIMIT
+CON_LIMIT_NORMAL = Config.NORMAL_TASK_LIMIT
+ADMIN_MODE = Config.ADMIN_USAGE_MODE
+ADMINS = set(Config.ADMIN)
