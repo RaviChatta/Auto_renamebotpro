@@ -1386,6 +1386,11 @@ async def add_metadata(input_path, output_path, user_id):
     if not ffmpeg:
         raise RuntimeError("FFmpeg not found in PATH")
 
+    # Ensure output path has proper extension
+    input_ext = os.path.splitext(input_path)[1].lower()
+    if not output_path.endswith(input_ext):
+        output_path = os.path.splitext(output_path)[0] + input_ext
+
     output_dir = os.path.dirname(output_path)
     await aiofiles.os.makedirs(output_dir, exist_ok=True)
 
@@ -1624,7 +1629,7 @@ async def auto_rename_files(client, message: Message):
                     ext = os.path.splitext(file_name)[1] or ('.mp4' if media_type == 'video' else '.mp3')
     
                 download_path = f"downloads/{file_name}"
-                metadata_path = f"metadata/{file_name}"
+                metadata_path = f"metadata/{os.path.splitext(file_name)[0]}{os.path.splitext(file_name)[1]}"
                 output_path = f"processed/{os.path.splitext(file_name)[0]}{ext}"
     
                 await aiofiles.os.makedirs(os.path.dirname(download_path), exist_ok=True)
