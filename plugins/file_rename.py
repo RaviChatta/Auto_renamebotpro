@@ -15,7 +15,7 @@ from hachoir.parser import createParser
 from pyrogram.enums import ParseMode
 from plugins.antinsfw import check_anti_nsfw
 from helper.utils import progress_for_pyrogram, humanbytes
-from helper import convert
+from helper.utils import convert
 from helper.database import DARKXSIDE78
 from config import Config
 import random
@@ -740,7 +740,7 @@ async def global_premium_control(client, message: Message):
     args = message.command[1:]
     if not args:
         status = "ON" if PREMIUM_MODE else "OFF"
-        expiry = f" (expires {PREMIUM_MODE_EXPIRY:%Y-%m-%d %H:%M})" if PREMIUM_MODE_EXPIRY else ""
+        expiry = f" (expires {PREMIUM_MODE_EXPIRY:%Y-%m-%d %H:%M})" if isinstance(PREMIUM_MODE_EXPIRY, datetime) else  ""
         return await message.reply_text(
             f"**➠ Cᴜʀʀᴇɴᴛ Tᴏᴋᴇɴ Usᴀɢᴇ: {status}{expiry}**\n\n"
             "**Usᴀɢᴇ:**\n"
@@ -784,11 +784,13 @@ async def check_premium_mode():
     PREMIUM_MODE        = settings.get("status", True)
     PREMIUM_MODE_EXPIRY = settings.get("expiry", None)
 
-    if PREMIUM_MODE_EXPIRY and datetime.now() > PREMIUM_MODE_EXPIRY:
-        PREMIUM_MODE = True
+    if PREMIUM_MODE_EXPIRY and isinstance(PREMIUM_MODE_EXPIRY, datetime) and datetime.now() > PREMIUM_MODE_EXPIRY:
+        PREMIUM_MODE = False  # Changed to disable premium mode on expiry
+        PREMIUM_MODE_EXPIRY = None
         await DARKXSIDE78.global_settings.update_one(
             {"_id": "premium_mode"},
-            {"$set": {"status": PREMIUM_MODE}}
+            {"$set": {"status": PREMIUM_MODE, "expiry": PREMIUM_MODE_EXPIRY}}
+
         )
 
 
@@ -1259,7 +1261,10 @@ async def auto_rename_files(client, message: Message):
 
     if ADMIN_MODE and user_id not in ADMINS:
         return await message.reply_text("Aᴅᴍɪɴ ᴍᴏᴅᴇ ɪs ᴀᴄᴛɪᴠᴇ - Oɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜɪs ʙᴏᴛ!")
-    
+    autorename_enabled = await DARKXSIDE78.get_autorename_status(user_id)
+    if not autorename_enabled:
+        return await message.reply_text("🔕 Auto-Rename is turned OFF.\nUse /autorename_on to enable it.")
+
     if message.document:
         file_id = message.document.file_id
         file_name = message.document.file_name
