@@ -164,161 +164,96 @@ def parse_duration(arg):
     return None
 
 def clean_title(raw_title):
-    """Clean and format the extracted title"""
+    """Clean and format the extracted title."""
     if not raw_title:
         return "Unknown"
-    
+
     if isinstance(raw_title, (tuple, list)):
         raw_title = " ".join(str(x) for x in raw_title)
     elif not isinstance(raw_title, str):
         raw_title = str(raw_title)
-    
-    for pattern in TITLE_CLEANING_PATTERNS:
-        raw_title = pattern.sub('', raw_title)
 
- 
-    # Convert to title case with special handling
-    words = raw_title.split()
-    formatted = []
-    for i, word in enumerate(words):
-        if i > 0 and word.lower() in {'a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on', 'at', 'to'}:
-            formatted.append(word.lower())
-        else:
-            # Handle special cases like "No." in "Kaiju No. 8"
-            if '-' in word:
-                parts = [p.capitalize() for p in word.split('-')]
-                formatted.append('-'.join(parts))
-            elif word.upper() == word:
-                formatted.append(word)
-            else:
-                formatted.append(word.capitalize())
-    
-    return ' '.join(formatted)
+    # Regex cleanup — allows hyphens, apostrophes, colons, dots
+    TITLE_CLEANING_PATTERNS_FIXED = [
+        r'@\w+',  # uploader
+        r'\[.*?\]', r'\(.*?\)',  # anything in [] or ()
+        r'\bS\d{1,2}[-_ ]?E\d{1,3}\b', r'\bE\d{1,3}\b', r'\bEP\d{1,3}\b',
+        r'\d{3,4}p', r'\b(480|720|1080|2160|1440)[pi]?\b',
+        r'\b(HDRip|HDTV|WEB[- ]?DL|WEB[- ]?RIP|Blu[- ]?Ray)\b',
+        r'\b(Dub|Sub|Dual|Multi)\b',
+        r'\bVolume\s*\d+\b', r'\bVol\s*\d+\b', r'\bV\s*\d+\b',
+        r'\d+MB', r'\d+GB',
+        r'\.\w{2,4}$',  # file extension
+        r'[_\-]{2,}',  # multiple separators
+    ]
+
+    for pattern in TITLE_CLEANING_PATTERNS_FIXED:
+        raw_title = re.sub(pattern, '', raw_title, flags=re.IGNORECASE)
+
+    # Keep hyphens, colons, apostrophes, dots – only remove dangerous special chars
+    raw_title = re.sub(r'[^\w\s\-:\'.]', '', raw_title)
+
+    # Normalize spaces
+    raw_title = re.sub(r'\s{2,}', ' ', raw_title)
+    raw_title = raw_title.strip()
+
+    return format_title_case(raw_title)
+
 def format_title_case(title):
-    """Properly format title case with exceptions"""
+    """Properly format title case with exceptions."""
     if not title:
         return ""
-    
+
     lowercase_words = {
         'a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on',
-        'at', 'to', 'from', 'by', 'of', 'in', 'with', 'as', 'is'
+        'at', 'to', 'from', 'by', 'of', 'in', 'with', 'as', 'is', 'no'
     }
-    
+
     words = title.split()
     if not words:
         return ""
-    
+
     formatted_words = []
     for i, word in enumerate(words):
         if i > 0 and word.lower() in lowercase_words:
             formatted_words.append(word.lower())
         else:
-            if "'" in word:
-                parts = word.split("'")
-                formatted = []
-                for part in parts:
-                    if part:
-                        formatted.append(part[0].upper() + part[1:].lower())
-                    else:
-                        formatted.append("'")
-                formatted_words.append("'".join(formatted))
-            else:
-                formatted_words.append(word[0].upper() + word[1:].lower())
-    
-    return ' '.join(formatted_words)
+            formatted_words.append(word[0].upper() + word[1:].lower() if len(word) > 1 else word.upper())
 
+    return ' '.join(formatted_words)
 def extract_title_from_filename(filename):
-    """Enhanced filename parser with better anime support"""
+    """Extract rough title from filename by stripping known junk."""
     if not filename:
         return "Unknown"
-    
-    if isinstance(filename, (tuple, list)):
-        filename = " ".join(str(x) for x in filename)
-    elif not isinstance(filename, str):
-        filename = str(filename)
-    
-    filename = re.sub(r'\.[^\.]+$', '', filename)
-    filename = re.sub(r'\[.*?\]', ' ', filename)
-    filename = re.sub(r'@\w+', '', filename)
-    filename = re.sub(r'[\(\)]', ' ', filename)
-    
-    # Anime-specific patterns
-    anime_patterns = [
-        r'(?:\[.*?\])?\s*(.*?)\s*[Ss](\d+)[\s\-_]*[Ee](\d+)\b',
-        r'(.*?)\s*[\-\s_](\d+)x(\d+)\b',
-        r'[Ss](\d+)[\s\-_]*[Ee](\d+)[\s\-_]*(.*?)(?:\s+\[|\s+\d{3,4}p|$)',
-        r'(.*?)\s*[Ss](\d+)[\s\-_]*[Ee](\d+)\b',
-        r'\[?[Ss](\d{1,2})[-_](\d{2})\]?\s*(.*?)(?:\s+\[|\s+\d{3,4}p|$)',
-        r'[Ss](\d{1,2})[_\-]?[Ee](\d{1,2})[_\-]+([A-Za-z0-9:_\-\s]+?)(?=[_\-]+\d{3,4}p|[_\-]+Sub|[_\-]+Dub|$)'
-    ]
-    
-    for pattern in anime_patterns:
-        match = re.search(pattern, filename, re.IGNORECASE)
-        if match:
-            title = match.group(1) if 'x' in pattern else match.group(3) if match.lastindex >= 3 else match.group(0)
-            title = re.sub(r'[\-\_]', ' ', title).strip()
-            if title and title != "Unknown":
-                return format_title_case(title)
 
-    # Enhanced bracket-based extraction
-    bracket_match = re.search(r'\]\s*([^\[\]]+?)\s*(?:\d{3,4}p|\[|$)', filename)
-    if bracket_match:
-        potential_title = bracket_match.group(1).strip()
-        if len(potential_title.split()) > 1:
-            return clean_title(potential_title)
-
-    # Quality-based separation
-    quality_match = re.search(r'(.*?)\s*(?:\d{3,4}p|WEB|BluRay|HDRip)', filename, re.IGNORECASE)
-    if quality_match:
-        potential_title = quality_match.group(1).strip()
-        if potential_title:
-            return clean_title(potential_title)
-
-    # Fallback patterns
-    fallback_patterns = [
-        r'^(.*?)(?:\s+-\s+\d+|$)',      # Before episode number
-        r'^(.*?)(?:\s+\(\d{4}\)|$)',    # Before year
-        r'^(.*?)(?:\s+\d{3,4}p|$)',     # Before quality
-        r'^(.*?)(?:\s+[Ss]\d|$)'        # Before season
-    ]
-    
-    for pattern in fallback_patterns:
-        match = re.search(pattern, filename)
-        if match:
-            potential_title = match.group(1).strip()
-            if potential_title:
-                return clean_title(potential_title)
-
+    filename = re.sub(r'\.[^\.]+$', '', filename)  # Remove extension
+    filename = filename.replace('_', ' ').replace('-', ' ')
     return clean_title(filename)
-
-def extract_season_episode(filename):
-    """Enhanced season/episode extraction with title detection"""
+def extract_season_episode_title(filename):
+    """
+    Extract season, episode, and title using SEASON_EPISODE_PATTERNS.
+    Returns: season, episode, cleaned_title
+    """
     if not filename:
-        return "01", None, "Unknown"
-    
-    # First try to extract title
-    title = extract_title_from_filename(filename)
-    
-    # Then extract season/episode
+        return "01", "01", "Unknown"
+
+    filename = re.sub(r'\.[^\.]+$', '', filename)
+
     for pattern, (season_group, episode_group) in SEASON_EPISODE_PATTERNS:
         match = pattern.search(filename)
         if match:
-            season = episode = None
-            if season_group:
-                season = match.group(1).zfill(2) if match.group(1) else "01"
-            if episode_group:
-                episode = match.group(2 if season_group else 1).zfill(2)
-            # Extract title by removing matched pattern and cleaning
+            season = match.group(1).zfill(2) if season_group else "01"
+            episode = match.group(2 if season_group else 1).zfill(2)
+
+            # Extract the title by removing matched part
             title_part = filename[:match.start()] + filename[match.end():]
-            title = clean_title(title_part)
-            
-            return season or "01", episode, title
-    
-    # If no pattern matched, try to extract just episode from filename
+            return season, episode, clean_title(title_part)
+
+    # Fallback: try to guess episode
     ep_match = re.search(r'\b(\d{1,3})\b', filename)
-    episode = ep_match.group(1).zfill(2) if ep_match else None
-    
+    episode = ep_match.group(1).zfill(2) if ep_match else "01"
     return "01", episode, clean_title(filename)
+
 
 def extract_quality(filename):
     """Extract and normalize video quality from a filename using regex patterns and quality map."""
