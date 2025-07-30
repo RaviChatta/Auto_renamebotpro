@@ -821,7 +821,7 @@ QUALITY_PATTERNS = [
     (re.compile(r'\b(Sub|Dub|Dual|Multi)\b', re.IGNORECASE), lambda m: m.group(1))
     
     # Rule 2: Remove mentions like @Uploader
-    (re.compile(r'@\w+'), lambda m: "")
+    (re.compile(r'@\w+'), lambda m: ""),
 
     (re.compile(r'\b(4kX264|4kx265)\b', re.IGNORECASE), lambda m: m.group(1)),
     (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1))
