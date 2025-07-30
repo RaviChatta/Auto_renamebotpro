@@ -828,15 +828,17 @@ QUALITY_PATTERNS = [
 ]
 # Add these patterns at the top of your code with other constants
 TITLE_CLEANING_PATTERNS = [
-    r'@\w+',
-    r'\[?S\d{1,2}[\s\-]*E\d{1,3}\]?', r'Season\s*\d{1,2}', r'Episode\s*\d{1,3}',
-    r'\d{1,2}x\d{1,3}', r'EP?\d{1,3}', r'\[\d{1,3}\]',
-    r'\[\d{3,4}[pi]\]', r'\d{3,4}p', r'4[kK]', r'2[kK]', 
-    r'HDTV', r'WEB[\- ]?DL', r'WEB[\- ]?Rip', r'Blu[\- ]?Ray',
-    r'x\d{3,4}', r'HDR', r'DTS', r'AAC', r'AC3',
-    r'\[(Sub|Dub|Dual Audio)\]', r'\[(Tam|Tel|Hin|Mal|Kan|Eng|Jpn)\]',
-    r'\[.*?\]', r'\(.*?\)', r'v\d', r'[\-_]', r'\d+MB', r'\d+GB',
-    r'\.\w{2,4}$', r'\d+p', r'x\d{3,4}',
+    re.compile(p, re.IGNORECASE) for p in [
+        r'@\w+',
+        r'\[?S\d{1,2}[\s\-]*E\d{1,3}\]?', r'Season\s*\d{1,2}', r'Episode\s*\d{1,3}',
+        r'\d{1,2}x\d{1,3}', r'EP?\d{1,3}', r'\[\d{1,3}\]',
+        r'\[\d{3,4}[pi]\]', r'\d{3,4}p', r'4[kK]', r'2[kK]', 
+        r'HDTV', r'WEB[\- ]?DL', r'WEB[\- ]?Rip', r'Blu[\- ]?Ray',
+        r'x\d{3,4}', r'HDR', r'DTS', r'AAC', r'AC3',
+        r'\[(Sub|Dub|Dual Audio)\]', r'\[(Tam|Tel|Hin|Mal|Kan|Eng|Jpn)\]',
+        r'\[.*?\]', r'\(.*?\)', r'v\d', r'[\-_]', r'\d+MB', r'\d+GB',
+        r'\.\w{2,4}$', r'\d+p', r'x\d{3,4}'
+    ]
 ]
 
 COMMON_WORDS_TO_REMOVE = [
@@ -852,21 +854,19 @@ def clean_title(raw_title):
     if not raw_title:
         return "Unknown"
     
-    # First remove file extension if present
-    raw_title = re.sub(r'\.[^\.]+$', '', raw_title)
-    
+    raw_title = re.sub(r'\.[^\.]+$', '', raw_title)  # Remove file extension
+
     for pattern in TITLE_CLEANING_PATTERNS:
-        raw_title = re.sub(pattern, '', raw_title, flags=re.IGNORECASE)
-    
+        raw_title = pattern.sub('', raw_title)
+
     for word in COMMON_WORDS_TO_REMOVE:
-        raw_title = re.sub(rf'\b{word}\b', '', raw_title, flags=re.IGNORECASE)
+        raw_title = re.sub(rf'\b{re.escape(word)}\b', '', raw_title, flags=re.IGNORECASE)
     
-    title = re.sub(r'[^\w\s]', ' ', raw_title)
-    title = re.sub(r'\s+', ' ', title).strip()
+    raw_title = re.sub(r'[^\w\s]', ' ', raw_title)
+    raw_title = re.sub(r'\s+', ' ', raw_title).strip()
     
-    if not title:
-        return "Unknown"
-    
+    return format_title_case(raw_title) if raw_title else "Unknown"
+
     return format_title_case(title)
 
 def format_title_case(title):
