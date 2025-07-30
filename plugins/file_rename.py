@@ -1,6 +1,3 @@
-ERROR:plugins.file_rename:Task error (attempt 1): cannot access local variable 'source_text' where it is not associated with a value
-ERROR:plugins.file_rename:Task error (attempt 2): cannot reuse already awaited coroutine
-ERROR:plugins.file_rename:Task error (attempt 3): cannot reuse already awaited coroutine
 import os
 import re
 import time
