@@ -817,6 +817,12 @@ QUALITY_PATTERNS = [
     (re.compile(r'\b(2k|1440p)\b', re.IGNORECASE), lambda m: "1440p"),
     (re.compile(r'\b(\d{3,4}[pi])\b', re.IGNORECASE), lambda m: m.group(1)),
     (re.compile(r'\b(HDRip|HDTV)\b', re.IGNORECASE), lambda m: m.group(1)),
+    # Rule 1: Preserve Sub, Dub, Dual, Multi
+    (re.compile(r'\b(Sub|Dub|Dual|Multi)\b', re.IGNORECASE), lambda m: m.group(1))
+    
+    # Rule 2: Remove mentions like @Uploader
+    (re.compile(r'@\w+'), lambda m: "")
+
     (re.compile(r'\b(4kX264|4kx265)\b', re.IGNORECASE), lambda m: m.group(1)),
     (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1))
 ]
@@ -897,22 +903,45 @@ def format_title_case(title):
     return ' '.join(formatted_words)
 
 def extract_title_from_filename(filename):
-    """Main title extraction function"""
+    """Improved filename parser for anime and general media files"""
     if not filename:
         return "Unknown"
     
-    # Remove extension first
+    # Remove file extension
     filename = re.sub(r'\.[^\.]+$', '', filename)
+
+    # -------------------------
+    # 1. Anime-specific patterns
+    # -------------------------
+    anime_patterns = [
+        r'^[Ss](\d+)[\.\-_ ]*[Ee](\d+)[\.\-_ ]*(.*?)(?:[\.\-_ ]+(?:480p|720p|1080p).*)?$',  # S01E03_Title
+        r'^(\d+)x(\d+)_([^_]+)(?:_(.*))?',        # 01x03_Title_...
+        r'^(\d+)_(\d+)_([^_]+)(?:_(.*))?',        # 01_03_Title_...
+        r'^S(\d+)_?E(\d+)_([^_]+)(?:_(.*))?',     # S01_E03_Title_...
+    ]
     
-    # Try to extract from brackets first
+    for pattern in anime_patterns:
+        match = re.match(pattern, filename, re.IGNORECASE)
+        if match:
+            title_part = match.group(3) if len(match.groups()) >= 3 else filename
+            title = re.sub(r'[_\-\:\.]+', ' ', title_part)
+            title = re.sub(r'\s+', ' ', title).strip()
+            if title:
+                return format_title_case(title)
+
+    # -------------------------
+    # 2. Bracket-based extraction
+    # -------------------------
     bracket_match = re.search(r'\[([^\]]+)\]', filename)
     if bracket_match:
         potential_title = bracket_match.group(1)
         if (len(potential_title.split()) > 1 and 
             not any(word in potential_title.lower() for word in COMMON_WORDS_TO_REMOVE)):
             return clean_title(potential_title)
-    
-    # Try common patterns
+
+    # -------------------------
+    # 3. General fallback patterns
+    # -------------------------
     patterns = [
         r'^(.*?)(?:\s*[-_]\s*[\[\(]|\[|\()',  # Before first [ or (
         r'^(.*?)(?:\s+[\[\(]|$)',             # Before first [ or ( or end
@@ -926,10 +955,11 @@ def extract_title_from_filename(filename):
             potential_title = match.group(1)
             if potential_title and len(potential_title.split()) >= 1:
                 return clean_title(potential_title)
-    
-    # Fallback to cleaning the whole filename
-    return clean_title(filename)
 
+    # -------------------------
+    # 4. Fallback to full cleaning
+    # -------------------------
+    return clean_title(filename)
 
 def extract_season_episode(filename):
     # Remove only (parentheses), not [brackets]
