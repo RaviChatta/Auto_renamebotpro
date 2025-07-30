@@ -854,8 +854,12 @@ def clean_title(raw_title):
     if not raw_title:
         return "Unknown"
     
-    raw_title = re.sub(r'\.[^\.]+$', '', raw_title)  # Remove file extension
-
+    # Ensure raw_title is a string
+    if isinstance(raw_title, (tuple, list)):
+        raw_title = " ".join(str(x) for x in raw_title)
+    elif not isinstance(raw_title, str):
+        raw_title = str(raw_title)
+    
     for pattern in TITLE_CLEANING_PATTERNS:
         raw_title = pattern.sub('', raw_title)
 
@@ -905,6 +909,12 @@ def extract_title_from_filename(filename):
     """Enhanced filename parser with better anime support"""
     if not filename:
         return "Unknown"
+    
+    # Ensure filename is a string (in case a tuple is passed)
+    if isinstance(filename, (tuple, list)):
+        filename = " ".join(str(x) for x in filename)
+    elif not isinstance(filename, str):
+        filename = str(filename)
     
     # Remove file extension and clean filename
     filename = re.sub(r'\.[^\.]+$', '', filename)
@@ -1332,7 +1342,13 @@ async def auto_rename_files(client, message: Message):
         file_ext = None
     else:
         return await message.reply_text("**Uɴsᴜᴘᴘᴏʀᴛᴇᴅ ғɪʟᴇ ᴛʏᴘᴇ**")
-        
+
+    # Ensure file_name is a string (add this right after the media type checks)
+    if not isinstance(file_name, str):
+        file_name = str(file_name)
+    if not file_name:  # Additional safety check
+        file_name = "unnamed_file"
+
     if user_id in active_sequences:
         if message.document:
             file_id = message.document.file_id
@@ -1418,6 +1434,7 @@ async def auto_rename_files(client, message: Message):
             msg = await message.reply_text("**Pʀᴏᴄᴇssɪɴɢ ʏᴏᴜʀ ғɪʟᴇ...**")
             
             try:
+                
                 audio_label = ""
                 
                 if media_type == "video" and media_preference == "document":
