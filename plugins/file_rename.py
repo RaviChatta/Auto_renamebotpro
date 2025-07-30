@@ -795,7 +795,13 @@ async def check_premium_mode():
             {"_id": "premium_mode"},
             {"$set": {"status": PREMIUM_MODE, "expiry": PREMIUM_MODE_EXPIRY}}
         )
-
+def sanitize_filename(filename):
+    """Remove invalid characters from filenames"""
+    # Remove invalid filesystem characters
+    filename = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '', filename)
+    # Replace multiple spaces with single space
+    filename = re.sub(r'\s+', ' ', filename).strip()
+    return filename
 SEASON_EPISODE_PATTERNS = [
     (re.compile(r'\[S(\d{1,2})[\s\-]*E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),
     (re.compile(r'S(\d{1,2})[\s\-]*E(\d{1,3})', re.IGNORECASE), ('season', 'episode')),
@@ -1387,12 +1393,9 @@ async def add_metadata(input_path, output_path, user_id):
         raise RuntimeError("FFmpeg not found in PATH")
 
     # Ensure output path has proper extension
-    input_ext = os.path.splitext(input_path)[1].lower()
-    if not output_path.endswith(input_ext):
-        output_path = os.path.splitext(output_path)[0] + input_ext
-
     output_dir = os.path.dirname(output_path)
-    await aiofiles.os.makedirs(output_dir, exist_ok=True)
+    output_filename = sanitize_filename(os.path.basename(output_path))
+    safe_output_path = os.path.join(output_dir, output_filename)
 
     # Get all metadata fields with proper fallbacks
     metadata_fields = {
@@ -1465,20 +1468,13 @@ async def add_metadata(input_path, output_path, user_id):
 
         if process.returncode != 0:
             error_msg = stderr.decode().strip()
-            logger.error(f"FFmpeg error: {error_msg}")
-            
-            if await aiofiles.os.path.exists(output_path):
-                await aiofiles.os.remove(output_path)
-            
             raise RuntimeError(f"Metadata addition failed: {error_msg}")
 
-        return output_path
+        return safe_output_path
 
     except Exception as e:
-        logger.error(f"Metadata processing failed: {e}")
-        await cleanup_files(output_path)
+        await cleanup_files(safe_output_path)
         raise
-
 async def convert_to_mkv(input_path, output_path):
     """Convert video file to MKV format"""
     ffmpeg = shutil.which('ffmpeg')
@@ -1558,6 +1554,11 @@ async def auto_rename_files(client, message: Message):
         output_path = None
     
         try:
+            file_name = sanitize_filename(file_name)
+                 # Use sanitized filename for all paths
+            download_path = f"downloads/{file_name}"
+            metadata_path = f"metadata/{os.path.splitext(file_name)[0]}{os.path.splitext(file_name)[1]}"
+            output_path = f"processed/{os.path.splitext(file_name)[0]}{ext}"
             media_preference = await DARKXSIDE78.get_media_preference(user_id)
             user_data = await DARKXSIDE78.col.find_one({"_id": user_id})
             is_premium = user_data.get("is_premium", False) if user_data else False
