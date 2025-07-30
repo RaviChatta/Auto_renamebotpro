@@ -15,7 +15,7 @@ from hachoir.parser import createParser
 from pyrogram.enums import ParseMode
 from plugins.antinsfw import check_anti_nsfw
 from helper.utils import progress_for_pyrogram, humanbytes
-from helper.utils  import convert
+from helper import convert
 from helper.database import DARKXSIDE78
 from config import Config
 import random
@@ -46,9 +46,6 @@ from pyrogram.enums import ChatAction
 import os
 import tempfile
 from playwright.async_api import async_playwright
-from platform import python_version, system, release
-import psutil
-
 
 def check_ban_status(func):
     @wraps(func)
@@ -57,7 +54,7 @@ def check_ban_status(func):
         is_banned, ban_reason = await DARKXSIDE78.is_user_banned(user_id)
         if is_banned:
             await message.reply_text(
-                f"**You are banned from using this bot.**\n\n**Reason:** {ban_reason}"
+                f"**Yᴏᴜ ᴀʀᴇ ʙᴀɴɴᴇᴅ ғʀᴏᴍ ᴜsɪɴɢ ᴛʜɪs ʙᴏᴛ.**\n\n**Rᴇᴀsᴏɴ:** {ban_reason}"
             )
             return
         return await func(client, message, *args, **kwargs)
@@ -98,7 +95,6 @@ def parse_duration(arg):
         return int(arg)
     return None
 
-
 @Client.on_message(filters.command("pdf_replace") & filters.reply)
 @check_ban_status
 async def pdf_replace_banner(client, message: Message):
@@ -127,7 +123,6 @@ async def pdf_replace_banner(client, message: Message):
         img = Image.open(temp_banner_path).convert("RGB")
         img = img.resize((800, 1131))
         img_pdf_path = temp_banner_path + ".pdf"
-        img.save(img_pdf_path, "PDF")
         img_reader = PdfReader(img_pdf_path)
         img_page = img_reader.pages[0]
         indices = set()
@@ -159,7 +154,7 @@ async def pdf_replace_banner(client, message: Message):
         await processing_msg.delete()
         await message.reply(f"**Fᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴘʟᴀᴄᴇ ᴘᴀɢᴇs﹕** `{e}`")
     finally:
-        for path in [input_path, output_path, temp_banner_path, img_pdf_path]:
+        for path in [input_path, output_path, temp_banner_path, temp_banner_path + ".pdf"]:
             if os.path.exists(path):
                 os.remove(path)
 
@@ -251,7 +246,7 @@ async def pdf_add_banner(client, message: Message):
         await processing_msg.delete()
         await message.reply(f"**Fᴀɪʟᴇᴅ ᴛᴏ ᴀᴅᴅ ʙᴀɴɴᴇʀ ᴘᴀɢᴇ⁽s⁾﹕** `{e}`")
     finally:
-        for path in [input_path, output_path, temp_banner_path, img_pdf_path]:
+        for path in [input_path, output_path, temp_banner_path, temp_banner_path + ".pdf"]:
             if os.path.exists(path):
                 os.remove(path)
 
@@ -260,10 +255,10 @@ async def pdf_add_banner(client, message: Message):
 async def set_pdf_lock_cmd(client, message: Message):
     args = message.text.split(maxsplit=1)
     if len(args) < 2 or not args[1].strip():
-        return await message.reply("**Usᴀɢᴇ﹕** `/set_pdf_lock yourpassword`")
+        return await message.reply("** Usᴀɢᴇ﹕** `/set_pdf_lock yourpassword`")
     password = args[1].strip()
     await DARKXSIDE78.set_pdf_lock_password(message.from_user.id, password)
-    await message.reply("**Dᴇꜰᴀᴜʟᴛ PDF ʟᴏᴄᴋ ᴘᴀssᴡᴏʀᴅ sᴇᴛ﹗ Nᴏᴡ ʏᴏᴜ ᴄᴀɴ ᴜsᴇ `/pdf_lock` ᴡɪᴛʜᴏᴜᴛ sᴘᴇᴄɪ�ʏɪɴɢ ᴀ ᴘᴀssᴡᴏʀᴅ.**")
+    await message.reply("**Dᴇꜰᴀᴜʟᴛ PDF ʟᴏᴄᴋ ᴘᴀssᴡᴏʀᴅ sᴇᴛ﹗ Nᴏᴡ ʏᴏᴜ ᴄᴀɴ ᴜsᴇ `/pdf_lock` ᴡɪᴛʜᴏᴜᴛ sᴘᴇᴄɪꜰʏɪɴɢ ᴀ ᴘᴀssᴡᴏʀᴅ.**")
 
 @Client.on_message(filters.command("pdf_lock") & filters.reply)
 @check_ban_status
@@ -332,6 +327,7 @@ async def pdf_remove_pages(client, message: Message):
                 writer.add_page(page)
         with open(output_path, "wb") as f:
             writer.write(f)
+        # Fetch user thumbnail if set
         thumb = await DARKXSIDE78.get_thumbnail(message.chat.id)
         thumb_path = None
         if thumb:
@@ -370,6 +366,7 @@ async def ffmpeg_upscale_photo(client, message):
             await status.edit("**Uᴘsᴄᴀʟɪɴɢ ꜰᴀɪʟᴇᴅ﹕ FFᴍᴘᴇɢ ɴᴏᴛ ꜰᴏᴜɴᴅ ᴏɴ sᴇʀᴠᴇʀ.**")
             return
 
+        # Get original dimensions
         process = await asyncio.create_subprocess_exec(
             ffmpeg, "-v", "error", "-select_streams", "v:0", "-show_entries",
             "stream=width,height", "-of", "csv=s=x:p=0", "-i", input_path,
@@ -397,9 +394,9 @@ async def ffmpeg_upscale_photo(client, message):
 
         cmd = [
             ffmpeg,
-            '-y',
-            '-i', input_path,
-            '-vf', vf,
+            "-y",
+            "-i", input_path,
+            "-vf", vf,
             output_path
         ]
         process = await asyncio.create_subprocess_exec(
@@ -467,7 +464,7 @@ class TaskQueue:
 
     async def add_task(self, user_id: int, file_id: str, message: Message, coro):
         if ADMIN_MODE and user_id not in ADMINS:
-            await message.reply_text("Admin mode active - Only admins can queue files!")
+            await message.reply_text("Aᴅᴍɪɴ ᴍᴏᴅᴇ ᴀᴄᴛɪᴠᴇ - Oɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ǫᴜᴇᴜᴇ ғɪʟᴇs!")
             return
 
         async with self.locks.setdefault(user_id, asyncio.Lock()):
@@ -526,9 +523,9 @@ class TaskQueue:
     async def _handle_failure(self, message: Message, file_id: str, error: Exception):
         try:
             await message.reply_text(
-                f"➠ Failed to process file after {self.max_retries} attempts\n"
-                f"➠ File ID: {file_id}\n"
-                f"➠ Error: {str(error)}"
+                f"➠ Fᴀɪʟᴇᴅ ᴛᴏ ᴘʀᴏᴄᴇss ғɪʟᴇ ᴀғᴛᴇʀ {self.max_retries} ᴀᴛᴛᴇᴍᴘᴛs\n"
+                f"➠ Fɪʟᴇ ID: {file_id}\n"
+                f"➠ Eʀʀᴏʀ: {str(error)}"
             )
         except Exception as e:
             logger.error(f"Failed to send error message: {e}")
@@ -559,7 +556,6 @@ class TaskQueue:
             return canceled
 
 task_queue = TaskQueue()
-
 
 @Client.on_message((filters.group | filters.private) & filters.command("queue"))
 @check_ban_status
@@ -596,7 +592,7 @@ def detect_quality(file_name):
         "1080p": 6,
         "1440p": 7,
         "2160p": 8
-    }
+        }
     match = re.search(r"(144p|240p|360p|480p|720p|1080p|1440p|2160p)", file_name)
     return quality_order.get(match.group(1), 8) if match else 9
 
@@ -629,7 +625,7 @@ async def end_sequence(client, message: Message):
     delete_messages = message_ids.pop(user_id, [])
 
     if not file_list:
-        return await message.reply_text("**Nᴏ ғɪʟᴇs ʀᴇᴄᴇɪᴠᴇᴅ ɪɴ �ʜɪs sᴇǫᴜᴇɴᴄᴇ!**")
+        return await message.reply_text("**Nᴏ ғɪʟᴇs ʀᴇᴄᴇɪᴠᴇᴅ ɪɴ ᴛʜɪs sᴇǫᴜᴇɴᴄᴇ!**")
 
     quality_order = {
         "144p": 1, "240p": 2, "360p": 3, "480p": 4,
@@ -744,11 +740,11 @@ async def global_premium_control(client, message: Message):
     args = message.command[1:]
     if not args:
         status = "ON" if PREMIUM_MODE else "OFF"
-        expiry = f" (expires {PREMIUM_MODE_EXPIRY:%Y-%m-%d %H:%M})" if isinstance(PREMIUM_MODE_EXPIRY, datetime) else ""
+        expiry = f" (expires {PREMIUM_MODE_EXPIRY:%Y-%m-%d %H:%M})" if PREMIUM_MODE_EXPIRY else ""
         return await message.reply_text(
             f"**➠ Cᴜʀʀᴇɴᴛ Tᴏᴋᴇɴ Usᴀɢᴇ: {status}{expiry}**\n\n"
             "**Usᴀɢᴇ:**\n"
-            "`/token_usage on [days|12m|1y]` — Eɴᴀʙʟᴇ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ\n"
+            "`/token_usage on [days|12m|1y]`  — Eɴᴀʙʟᴇ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ\n"
             "`/token_usage off [days|12m|1y]` — Dɪsᴀʙʟᴇ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ"
         )
 
@@ -777,7 +773,7 @@ async def global_premium_control(client, message: Message):
         upsert=True
     )
     await message.reply_text(msg)
-    
+
 async def check_premium_mode():
     global PREMIUM_MODE, PREMIUM_MODE_EXPIRY
 
@@ -785,60 +781,46 @@ async def check_premium_mode():
     if not settings:
         return
 
-    PREMIUM_MODE = settings.get("status", True)
+    PREMIUM_MODE        = settings.get("status", True)
     PREMIUM_MODE_EXPIRY = settings.get("expiry", None)
 
-    if PREMIUM_MODE_EXPIRY and isinstance(PREMIUM_MODE_EXPIRY, datetime) and datetime.now() > PREMIUM_MODE_EXPIRY:
-        PREMIUM_MODE = False  # Changed to disable premium mode on expiry
-        PREMIUM_MODE_EXPIRY = None
+    if PREMIUM_MODE_EXPIRY and datetime.now() > PREMIUM_MODE_EXPIRY:
+        PREMIUM_MODE = True
         await DARKXSIDE78.global_settings.update_one(
             {"_id": "premium_mode"},
-            {"$set": {"status": PREMIUM_MODE, "expiry": PREMIUM_MODE_EXPIRY}}
+            {"$set": {"status": PREMIUM_MODE}}
         )
-def sanitize_filename(filename):
-    """Remove invalid characters from filenames"""
-    # Remove invalid filesystem characters
-    filename = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '', filename)
-    # Replace multiple spaces with single space
-    filename = re.sub(r'\s+', ' ', filename).strip()
-    return filename
+
+
 SEASON_EPISODE_PATTERNS = [
-    (re.compile(r'\[S(\d{1,2})[\s\-]*E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),
-    (re.compile(r'S(\d{1,2})[\s\-]*E(\d{1,3})', re.IGNORECASE), ('season', 'episode')),
-    (re.compile(r'S(\d{1,2})[\._]?E(\d{1,3})', re.IGNORECASE), ('season', 'episode')),
-    (re.compile(r'Season[\s\-]*(\d{1,2})[\s\-]*Episode[\s\-]*(\d{1,3})', re.IGNORECASE), ('season', 'episode')),
-    (re.compile(r'(\d{1,2})x(\d{1,3})', re.IGNORECASE), ('season', 'episode')),
-    (re.compile(r'(\d{1,3})[vV]\d{1}', re.IGNORECASE), (None, 'episode')),
-    (re.compile(r'EP?(\d{1,3})', re.IGNORECASE), (None, 'episode')),
-    (re.compile(r'(\d{1,3})[\._]', re.IGNORECASE), (None, 'episode')),
-    (re.compile(r'\[(\d{1,3})\]', re.IGNORECASE), (None, 'episode')),
-    (re.compile(r'\b(\d{1,3})\b', re.IGNORECASE), (None, 'episode')),
+    (re.compile(r'\[S(\d{1,2})[\s\-]+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),   # [S01-E06]
+    (re.compile(r'\[S(\d{1,2})[\s\-]+(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),     # [S01-06]
+    (re.compile(r'\[S(\d{1,2})\s+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),        # [S01 E06]
+    (re.compile(r'\[S\s*(\d{1,2})\s*E\s*(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')), # [S 1 E 1]
+    (re.compile(r'S(\d{1,2})[\s\-]+E(\d{1,3})', re.IGNORECASE), ('season', 'episode')),        # S01-E06, S01 E06
+    (re.compile(r'S(\d{1,2})[\s\-]+(\d{1,3})', re.IGNORECASE), ('season', 'episode')),         # S01-06, S01 06
+    (re.compile(r'S(\d+)(?:E|EP)(\d+)'), ('season', 'episode')),
+    (re.compile(r'S(\d+)[\s-]*(?:E|EP)(\d+)'), ('season', 'episode')),
+    (re.compile(r'Season\s*(\d+)\s*Episode\s*(\d+)', re.IGNORECASE), ('season', 'episode')),
+    (re.compile(r'\[S(\d+)\]\[E(\d+)\]'), ('season', 'episode')),
+    (re.compile(r'S(\d+)[^\d]+(\d{1,3})\b'), ('season', 'episode')),
+    (re.compile(r'(?:E|EP|Episode)\s*(\d+)', re.IGNORECASE), (None, 'episode')),
+    (re.compile(r'\b(\d{1,3})\b'), (None, 'episode'))
 ]
 
 QUALITY_PATTERNS = [
-    (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1)),
-    (re.compile(r'\b(\d{3,4})p\b', re.IGNORECASE), lambda m: f"{m.group(1)}p"),
-    (re.compile(r'\b(4k|2160p|UHD)\b', re.IGNORECASE), lambda m: "2160p"),
-    (re.compile(r'\b(2k|1440p|QHD)\b', re.IGNORECASE), lambda m: "1440p"),
-    (re.compile(r'\b(1080p|FHD)\b', re.IGNORECASE), lambda m: "1080p"),
-    (re.compile(r'\b(720p|HD)\b', re.IGNORECASE), lambda m: "720p"),
-    (re.compile(r'\b(480p|SD)\b', re.IGNORECASE), lambda m: "480p"),
-    (re.compile(r'\b(360p)\b', re.IGNORECASE), lambda m: "360p"),
-    (re.compile(r'\b(240p)\b', re.IGNORECASE), lambda m: "240p"),
-    (re.compile(r'\b(144p)\b', re.IGNORECASE), lambda m: "144p"),
+    (re.compile(r'\[(\d{3,4}p)\](?:\s*\[\1\])*', re.IGNORECASE), lambda m: m.group(1)),
+    (re.compile(r'\b(\d{3,4})p?\b'), lambda m: f"{m.group(1)}p"),
+    (re.compile(r'\b(4k|2160p)\b', re.IGNORECASE), lambda m: "2160p"),
+    (re.compile(r'\b(2k|1440p)\b', re.IGNORECASE), lambda m: "1440p"),
+    (re.compile(r'\b(\d{3,4}[pi])\b', re.IGNORECASE), lambda m: m.group(1)),
+    (re.compile(r'\b(HDRip|HDTV)\b', re.IGNORECASE), lambda m: m.group(1)),
+    (re.compile(r'\b(4kX264|4kx265)\b', re.IGNORECASE), lambda m: m.group(1)),
+    (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1))
 ]
-
-CODEC_PATTERNS = [
-    (re.compile(r'\b(x264|x265|HEVC|H264|H265|AVC)\b', re.IGNORECASE), 
-     lambda m: m.group(1).lower().replace('h264', 'x264').replace('h265', 'HEVC')),
-]
-
-LANGUAGE_PATTERNS = [
-    (re.compile(r'\[(Sub|Dub|Dual Audio)\]', re.IGNORECASE), lambda m: m.group(1)),
-    (re.compile(r'\b(Sub|Dub|Dual)\b', re.IGNORECASE), lambda m: m.group(1)),
-]
-
+# Add these patterns at the top of your code with other constants
 TITLE_CLEANING_PATTERNS = [
+    r'@\w+',
     r'\[?S\d{1,2}[\s\-]*E\d{1,3}\]?', r'Season\s*\d{1,2}', r'Episode\s*\d{1,3}',
     r'\d{1,2}x\d{1,3}', r'EP?\d{1,3}', r'\[\d{1,3}\]',
     r'\[\d{3,4}[pi]\]', r'\d{3,4}p', r'4[kK]', r'2[kK]', 
@@ -861,6 +843,9 @@ def clean_title(raw_title):
     """Clean and format the extracted title"""
     if not raw_title:
         return "Unknown"
+    
+    # First remove file extension if present
+    raw_title = re.sub(r'\.[^\.]+$', '', raw_title)
     
     for pattern in TITLE_CLEANING_PATTERNS:
         raw_title = re.sub(pattern, '', raw_title, flags=re.IGNORECASE)
@@ -914,8 +899,10 @@ def extract_title_from_filename(filename):
     if not filename:
         return "Unknown"
     
+    # Remove extension first
     filename = re.sub(r'\.[^\.]+$', '', filename)
     
+    # Try to extract from brackets first
     bracket_match = re.search(r'\[([^\]]+)\]', filename)
     if bracket_match:
         potential_title = bracket_match.group(1)
@@ -923,9 +910,12 @@ def extract_title_from_filename(filename):
             not any(word in potential_title.lower() for word in COMMON_WORDS_TO_REMOVE)):
             return clean_title(potential_title)
     
+    # Try common patterns
     patterns = [
-        r'^(.*?)(?:\s*[-_]\s*[\[\(]|\[|\()',
-        r'^(.*?)(?:\s+[\[\(]|$)'
+        r'^(.*?)(?:\s*[-_]\s*[\[\(]|\[|\()',  # Before first [ or (
+        r'^(.*?)(?:\s+[\[\(]|$)',             # Before first [ or ( or end
+        r'^(.*?)(?:\s+\d{3,4}p|$)',           # Before resolution or end
+        r'^(.*?)(?:\s+[Ss]\d{1,2}|$)'         # Before season or end
     ]
     
     for pattern in patterns:
@@ -935,103 +925,49 @@ def extract_title_from_filename(filename):
             if potential_title and len(potential_title.split()) >= 1:
                 return clean_title(potential_title)
     
+    # Fallback to cleaning the whole filename
     return clean_title(filename)
 
+
 def extract_season_episode(filename):
-    """Enhanced season/episode extraction"""
-    if not filename:
-        return None, None
+    # Remove only (parentheses), not [brackets]
+    filename = re.sub(r'\(.*?\)', ' ', filename)
     
     for pattern, (season_group, episode_group) in SEASON_EPISODE_PATTERNS:
         match = pattern.search(filename)
         if match:
-            season = match.group(1).zfill(2) if season_group else None
-            episode = match.group(2 if season_group else 1).zfill(3) if episode_group else None
-            if season or episode:
-                return season, episode
+            season = episode = None
+            if season_group:
+                season = match.group(1).zfill(2) if match.group(1) else "01"
+            if episode_group:
+                episode = match.group(2 if season_group else 1).zfill(2)
+            
+            logger.info(f"Extracted season: {season}, episode: {episode} from {filename}")
+            return season or "01", episode
     
-    return None, None
-    
+    logger.warning(f"No season/episode pattern matched for {filename}")
+    return "01", None
+
 def extract_quality(filename):
-    """Enhanced quality extraction"""
-    if not filename:
-        return None
+    seen = set()
+    quality_parts = []
     
     for pattern, extractor in QUALITY_PATTERNS:
         match = pattern.search(filename)
         if match:
-            quality = extractor(match)
-            return quality
+            quality = extractor(match).lower()
+            if quality not in seen:
+                quality_parts.append(quality)
+                seen.add(quality)
+                filename = filename.replace(match.group(0), '', 1)
     
-    return None
+    return " ".join(quality_parts) if quality_parts else "Unknown"
 
-def extract_language(filename):
-    """Extract language/sub/dub information"""
-    if not filename:
-        return None
-    
-    for pattern, extractor in LANGUAGE_PATTERNS:
-        match = pattern.search(filename)
-        if match:
-            return extractor(match)
-    
-    return None
-
-async def extract_codec(filename, file_path):
-    """Extract codec from filename or ffprobe."""
-    if not filename and not file_path:
-        return None
-    
-    for pattern, extractor in CODEC_PATTERNS:
-        match = pattern.search(filename)
-        if match:
-            codec = extractor(match)
-            logger.info(f"Extracted codec: {codec} from {filename}")
-            return codec
-    
-    if file_path:
-        ffprobe = shutil.which('ffprobe')
-        if not ffprobe:
-            logger.warning("ffprobe not found, skipping codec detection")
-            return None
-
-        cmd = [
-            ffprobe,
-            '-v', 'quiet',
-            '-print_format', 'json',
-            '-show_streams',
-            '-select_streams', 'v',
-            file_path
-        ]
-
-        try:
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await process.communicate()
-            info = json.loads(stdout)
-            streams = info.get('streams', [])
-            if not streams:
-                return None
-            video_stream = streams[0]
-            codec = video_stream.get('codec_name', '').lower()
-            codec = 'HEVC' if codec == 'hevc' else 'x264' if codec == 'h264' else codec
-            if codec in {'x264', 'HEVC'}:
-                logger.info(f"Extracted codec: {codec} from ffprobe")
-                return codec
-            return None
-        except Exception as e:
-            logger.error(f"Codec detection error: {e}")
-            return None
 
 async def detect_audio_info(file_path):
-    """Detect audio and subtitle information using ffprobe."""
     ffprobe = shutil.which('ffprobe')
     if not ffprobe:
-        logger.warning("ffprobe not found, skipping audio detection")
-        return 0, 0, [], 0
+        raise RuntimeError("ffprobe not found in PATH")
 
     cmd = [
         ffprobe,
@@ -1051,42 +987,52 @@ async def detect_audio_info(file_path):
     try:
         info = json.loads(stdout)
         streams = info.get('streams', [])
+        
         audio_streams = [s for s in streams if s.get('codec_type') == 'audio']
         sub_streams = [s for s in streams if s.get('codec_type') == 'subtitle']
 
-        audio_languages = []
+        japanese_audio = 0
+        english_audio = 0
         for audio in audio_streams:
             lang = audio.get('tags', {}).get('language', '').lower()
             if lang in {'ja', 'jpn', 'japanese'}:
-                audio_languages.append('Jpn')
+                japanese_audio += 1
             elif lang in {'en', 'eng', 'english'}:
-                audio_languages.append('Eng')
-            elif lang in {'ta', 'tam', 'tamil'}:
-                audio_languages.append('Tam')
-            elif lang in {'te', 'tel', 'telugu'}:
-                audio_languages.append('Tel')
-            elif lang in {'hi', 'hin', 'hindi'}:
-                audio_languages.append('Hin')
-            elif lang in {'ml', 'mal', 'malayalam'}:
-                audio_languages.append('Mal')
-            elif lang in {'kn', 'kan', 'kannada'}:
-                audio_languages.append('Kan')
-            else:
-                audio_languages.append('Unknown')
+                english_audio += 1
 
-        english_subs = sum(1 for sub in sub_streams if sub.get('tags', {}).get('language', '').lower() in {'en', 'eng', 'english'})
+        english_subs = len([
+            s for s in sub_streams 
+            if s.get('tags', {}).get('language', '').lower() in {'en', 'eng', 'english'}
+        ])
 
-        return len(audio_streams), len(sub_streams), audio_languages, english_subs
+        return len(audio_streams), len(sub_streams), japanese_audio, english_audio, english_subs
     except Exception as e:
         logger.error(f"Audio detection error: {e}")
-        return 0, 0, [], 0
+        return 0, 0, 0, 0, 0
+
+def get_audio_label(audio_info):
+    audio_count, sub_count, jp_audio, en_audio, en_subs = audio_info
+    
+    if audio_count == 1:
+        if jp_audio >= 1 and en_subs >= 1:
+            return "Sub" + ("s" if sub_count > 1 else "")
+        if en_audio >= 1:
+            return "Dub"
+    
+    if audio_count == 2:
+        return "Dual"
+    elif audio_count == 3:
+        return "Tri"
+    elif audio_count >= 4:
+        return "Multi"
+    
+    return "Unknown"
 
 async def detect_video_resolution(file_path):
-    """Detect actual video resolution using ffprobe."""
+    """Detect actual video resolution using FFmpeg"""
     ffprobe = shutil.which('ffprobe')
     if not ffprobe:
-        logger.warning("ffprobe not found, skipping resolution detection")
-        return None
+        raise RuntimeError("ffprobe not found in PATH")
 
     cmd = [
         ffprobe,
@@ -1107,8 +1053,10 @@ async def detect_video_resolution(file_path):
     try:
         info = json.loads(stdout)
         streams = info.get('streams', [])
+        
         if not streams:
-            return None
+            return "Unknown"
+            
         video_stream = streams[0]
         width = video_stream.get('width', 0)
         height = video_stream.get('height', 0)
@@ -1134,71 +1082,93 @@ async def detect_video_resolution(file_path):
             
     except Exception as e:
         logger.error(f"Resolution detection error: {e}")
+        return "Unknown"
+
+async def process_thumbnail(thumb_path):
+    if not thumb_path or not await aiofiles.os.path.exists(thumb_path):
+        return None
+    try:
+        img = await asyncio.to_thread(Image.open, thumb_path)
+        img = await asyncio.to_thread(lambda: img.convert("RGB").resize((320, 320)))
+        await asyncio.to_thread(img.save, thumb_path, "JPEG")
+        return thumb_path
+    except Exception as e:
+        logger.error(f"Thumbnail processing failed: {e}")
+        await cleanup_files(thumb_path)
         return None
 
-def get_audio_label(audio_info, filename=None):
-    """Generate audio label based on audio and subtitle info or filename."""
-    if not audio_info:
-        return None
-        
-    audio_count, sub_count, audio_languages, english_subs = audio_info
-    LANG_MAP = {
-        'tam': 'Tam', 'tamil': 'Tam',
-        'tel': 'Tel', 'telugu': 'Tel',
-        'hin': 'Hin', 'hindi': 'Hin',
-        'mal': 'Mal', 'malayalam': 'Mal',
-        'kan': 'Kan', 'kannada': 'Kan',
-        'eng': 'Eng', 'english': 'Eng',
-        'jpn': 'Jpn', 'japanese': 'Jpn'
+async def cleanup_files(*paths):
+    for path in paths:
+        try:
+            if path and await aiofiles.os.path.exists(path):
+                await aiofiles.os.remove(path)
+        except Exception as e:
+            logger.error(f"Error removing {path}: {e}")
+
+async def add_metadata(input_path, output_path, user_id):
+    ffmpeg = shutil.which('ffmpeg')
+    if not ffmpeg:
+        raise RuntimeError("FFmpeg not found in PATH")
+
+    output_dir = os.path.dirname(output_path)
+    await aiofiles.os.makedirs(output_dir, exist_ok=True)
+
+    metadata = {
+        'title': await DARKXSIDE78.get_title(user_id),
+        'video': await DARKXSIDE78.get_video(user_id),
+        'audio': await DARKXSIDE78.get_audio(user_id),
+        'subtitle': await DARKXSIDE78.get_subtitle(user_id),
+        'artist': await DARKXSIDE78.get_artist(user_id),
+        'author': await DARKXSIDE78.get_author(user_id),
+        'encoded_by': await DARKXSIDE78.get_encoded_by(user_id),
+        'custom_tag': await DARKXSIDE78.get_custom_tag(user_id),
+        'commentz': await DARKXSIDE78.get_commentz(user_id)
     }
 
-    if filename:
-        lang_match = re.search(
-            r'\[((?:\s*(?:Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)\s*\+?)+)\]',
-            filename, re.IGNORECASE
+    cmd = [
+        ffmpeg,
+        '-hide_banner',
+        '-i', input_path,
+        '-map', '0',
+        '-c', 'copy',
+        '-metadata', f'title={metadata["title"]}',
+        '-metadata:s:v', f'title={metadata["video"]}',
+        '-metadata:s:s', f'title={metadata["subtitle"]}',
+        '-metadata:s:a', f'title={metadata["audio"]}',
+        '-metadata', f'artist={metadata["artist"]}',
+        '-metadata', f'author={metadata["author"]}',
+        '-metadata', f'encoded_by={metadata["encoded_by"]}',
+        '-metadata', f'comment={metadata["commentz"]}',
+        '-metadata', f'custom_tag={metadata["custom_tag"]}',
+        '-loglevel', 'error',
+        '-y'
+    ]
+
+    cmd += ['-f', 'matroska', output_path]
+
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
         )
-        if lang_match:
-            raw_langs = re.findall(
-                r'(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)',
-                lang_match.group(0), re.IGNORECASE
-            )
-            normalized = [LANG_MAP.get(lang.lower(), lang) for lang in raw_langs]
-            return f"[{' + '.join(sorted(set(normalized)))}]"
+        _, stderr = await process.communicate()
 
-        if audio_count == 0:
-            lang_match = re.search(
-                r'\b(Tam|Tamil|Tel|Telugu|Hin|Hindi|Mal|Malayalam|Kan|Kannada|Eng|English|Jpn|Japanese)\b',
-                filename, re.IGNORECASE
-            )
-            if lang_match:
-                lang = lang_match.group(1).lower()
-                return LANG_MAP.get(lang, lang)
+        if process.returncode != 0:
+            error_msg = stderr.decode().strip()
+            logger.error(f"FFmpeg error: {error_msg}")
+            
+            if await aiofiles.os.path.exists(output_path):
+                await aiofiles.os.remove(output_path)
+            
+            raise RuntimeError(f"Metadata addition failed: {error_msg}")
 
-    if audio_count > 1 and audio_languages:
-        unique_languages = sorted(set(lang for lang in audio_languages if lang != 'Unknown'))
-        if unique_languages:
-            return f"[{' + '.join(unique_languages)}]"
-        return "Multi"
+        return output_path
 
-    if audio_count == 1:
-        lang = audio_languages[0] if audio_languages else 'Unknown'
-        if lang == 'Jpn' and english_subs >= 1:
-            return "Sub"
-        if lang == 'Eng':
-            return "Dub"
-        return lang if lang != 'Unknown' else None
-
-    return "Multi" if audio_count > 1 else None
-
-def extract_year(filename):
-    """Extract year from filename."""
-    match = re.search(r'\b(19\d{2}|20\d{2})\b(?!\w)', filename)
-    if match:
-        year = match.group(1)
-        logger.info(f"Extracted year: {year} from {filename}")
-        return year
-    logger.debug(f"No year found in {filename}")
-    return None
+    except Exception as e:
+        logger.error(f"Metadata processing failed: {e}")
+        await cleanup_files(output_path)
+        raise
 
 def extract_chapter(filename): 
     """Extract chapter number from filename"""
@@ -1250,231 +1220,6 @@ def extract_volume(filename):
 
     return None
 
-def extract_title(source_text):
-    """Improved title extraction with better cleaning"""
-    if not source_text:
-        return "Unknown"
-    
-    patterns_to_remove = [
-        r'\[?S\d{1,2}[\s\-]*E\d{1,3}\]?', r'Season\s*\d{1,2}', r'Episode\s*\d{1,3}',
-        r'\d{1,2}x\d{1,3}', r'EP?\d{1,3}', r'\[\d{1,3}\]',
-        r'\[\d{3,4}[pi]\]', r'\d{3,4}p', r'4[kK]', r'2[kK]', 
-        r'HDTV', r'WEB[\- ]?DL', r'WEB[\- ]?Rip', r'Blu[\- ]?Ray',
-        r'x\d{3,4}', r'HDR', r'DTS', r'AAC', r'AC3',
-        r'\[(Sub|Dub|Dual Audio)\]', r'\[(Tam|Tel|Hin|Mal|Kan|Eng|Jpn)\]',
-        r'\[.*?\]', r'\(.*?\)', r'v\d', r'[\-_]', r'\d+MB', r'\d+GB',
-        r'\[.*\]', r'\(.*\)', r'\.\w{2,4}$', r'\d+p', r'x\d{3,4}',
-    ]
-    
-    for pattern in patterns_to_remove:
-        source_text = re.sub(pattern, '', source_text, flags=re.IGNORECASE)
-    
-    source_text = re.sub(r'[^\w\s]', ' ', source_text)
-    source_text = re.sub(r'\s+', ' ', source_text).strip()
-    
-    words = source_text.split()
-    formatted_words = []
-    for word in words:
-        if word.isupper() or word.islower():
-            formatted_words.append(word.title())
-        else:
-            formatted_words.append(word)
-    
-    return ' '.join(formatted_words)
-
-async def get_replacements(source_text, file_path=None):
-    """Generate all possible replacements with fallbacks"""
-    if not source_text:
-        source_text = ""
-    
-    season, episode = extract_season_episode(source_text)
-    chapter = extract_chapter(source_text)
-    volume = extract_volume(source_text)
-    quality = extract_quality(source_text)
-    language = extract_language(source_text)
-    title = extract_title(source_text)
-    codec = await extract_codec(source_text, file_path)
-    year = extract_year(source_text)
-    
-    # Get actual resolution if available
-    actual_resolution = None
-    if file_path and any(x in source_text.lower() for x in ['video', 'mp4', 'mkv', 'mov']):
-        actual_resolution = await detect_video_resolution(file_path)
-    
-    # Get audio info if available
-    audio_info = None
-    if file_path:
-        audio_info = await detect_audio_info(file_path)
-    audio_label = get_audio_label(audio_info, source_text) if audio_info else None
-
-    return {
-        # Standard placeholders
-        '{title}': title or 'Unknown',
-        '{season}': season or 'XX',
-        '{episode}': episode or 'XX',
-        '{chapter}': chapter or 'XX',
-        '{volume}': volume or 'XX',
-        '{quality}': quality or '',
-        '{audio}': audio_label or '',
-        '{codec}': codec or '',
-        '{year}': year or '',
-        '{resolution}': actual_resolution or quality or '',
-        
-        # Uppercase variants
-        '{TITLE}': (title or 'Unknown').upper(),
-        '{SEASON}': (season or 'XX').upper(),
-        '{EPISODE}': (episode or 'XX').upper(),
-        '{CHAPTER}': (chapter or 'XX').upper(),
-        '{VOLUME}': (volume or 'XX').upper(),
-        '{QUALITY}': (quality or '').upper(),
-        '{AUDIO}': (audio_label or '').upper(),
-        '{CODEC}': (codec or '').upper(),
-        '{YEAR}': (year or '').upper(),
-        '{RESOLUTION}': (actual_resolution or quality or '').upper(),
-        
-        # Titlecase variants
-        '{Title}': (title or 'Unknown').title(),
-        '{Season}': (season or 'XX').title(),
-        '{Episode}': (episode or 'XX').title(),
-        '{Chapter}': (chapter or 'XX').title(),
-        '{Volume}': (volume or 'XX').title(),
-        '{Quality}': (quality or '').title(),
-        '{Audio}': (audio_label or '').title(),
-        '{Codec}': (codec or '').title(),
-        '{Year}': (year or '').title(),
-        '{Resolution}': (actual_resolution or quality or '').title(),
-    }
-
-def format_filename(template, replacements):
-    """Safely format filename with all possible placeholders"""
-    try:
-        # First pass with all standard replacements
-        filename = template
-        
-        # Replace all known placeholders
-        for placeholder, value in replacements.items():
-            filename = filename.replace(placeholder, str(value))
-            
-        # Clean up any remaining invalid characters
-        filename = re.sub(r'[<>:"/\\|?*]', '', filename)  # Remove invalid filename chars
-        filename = re.sub(r'\s+', ' ', filename).strip()  # Normalize spaces
-        filename = re.sub(r'\[\s*\]', '', filename)  # Remove empty brackets
-        filename = re.sub(r'\(\s*\)', '', filename)  # Remove empty parentheses
-        
-        return filename
-    except Exception as e:
-        logger.error(f"Filename formatting failed: {e}")
-        return "Renamed_File"  # Fallback name
-
-async def process_thumbnail(thumb_path):
-    if not thumb_path or not await aiofiles.os.path.exists(thumb_path):
-        return None
-    try:
-        img = await asyncio.to_thread(Image.open, thumb_path)
-        img = await asyncio.to_thread(lambda: img.convert("RGB").resize((320, 320)))
-        await asyncio.to_thread(img.save, thumb_path, "JPEG")
-        return thumb_path
-    except Exception as e:
-        logger.error(f"Thumbnail processing failed: {e}")
-        await cleanup_files(thumb_path)
-        return None
-
-async def cleanup_files(*paths):
-    for path in paths:
-        try:
-            if path and await aiofiles.os.path.exists(path):
-                await aiofiles.os.remove(path)
-        except Exception as e:
-            logger.error(f"Error removing {path}: {e}")
-
-async def add_metadata(input_path, output_path, user_id):
-    ffmpeg = shutil.which('ffmpeg')
-    if not ffmpeg:
-        raise RuntimeError("FFmpeg not found in PATH")
-
-    # Ensure output path has proper extension
-    output_dir = os.path.dirname(output_path)
-    output_filename = sanitize_filename(os.path.basename(output_path))
-    safe_output_path = os.path.join(output_dir, output_filename)
-
-    # Get all metadata fields with proper fallbacks
-    metadata_fields = {
-        'title': await DARKXSIDE78.get_title(user_id) or "Untitled",
-        'video': await DARKXSIDE78.get_video(user_id) or "",
-        'audio': await DARKXSIDE78.get_audio(user_id) or "",
-        'subtitle': await DARKXSIDE78.get_subtitle(user_id) or "",
-        'artist': await DARKXSIDE78.get_artist(user_id) or "",
-        'author': await DARKXSIDE78.get_author(user_id) or "",
-        'encoded_by': await DARKXSIDE78.get_encoded_by(user_id) or "",
-        'custom_tag': await DARKXSIDE78.get_custom_tag(user_id) or "",
-        'commentz': await DARKXSIDE78.get_commentz(user_id) or ""
-    }
-
-    # First try with all metadata
-    try:
-        cmd = [
-            ffmpeg,
-            '-hide_banner',
-            '-i', input_path,
-            '-map', '0',
-            '-c', 'copy',
-            '-metadata', f'title={metadata_fields["title"]}',
-            '-metadata:s:v', f'title={metadata_fields["video"]}',
-            '-metadata:s:s', f'title={metadata_fields["subtitle"]}',
-            '-metadata:s:a', f'title={metadata_fields["audio"]}',
-            '-metadata', f'artist={metadata_fields["artist"]}',
-            '-metadata', f'author={metadata_fields["author"]}',
-            '-metadata', f'encoded_by={metadata_fields["encoded_by"]}',
-            '-metadata', f'comment={metadata_fields["commentz"]}',
-            '-metadata', f'custom_tag={metadata_fields["custom_tag"]}',
-            '-loglevel', 'error',
-            '-y',
-            output_path
-        ]
-
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        _, stderr = await process.communicate()
-
-        if process.returncode == 0:
-            return output_path
-
-    except Exception as e:
-        logger.warning(f"Full metadata addition failed, trying with basic metadata: {e}")
-
-    # Fallback to just title if full metadata fails
-    try:
-        cmd = [
-            ffmpeg,
-            '-hide_banner',
-            '-i', input_path,
-            '-map', '0',
-            '-c', 'copy',
-            '-metadata', f'title={metadata_fields["title"]}',
-            '-loglevel', 'error',
-            '-y',
-            output_path
-        ]
-
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        _, stderr = await process.communicate()
-
-        if process.returncode != 0:
-            error_msg = stderr.decode().strip()
-            raise RuntimeError(f"Metadata addition failed: {error_msg}")
-
-        return safe_output_path
-
-    except Exception as e:
-        await cleanup_files(safe_output_path)
-        raise
 async def convert_to_mkv(input_path, output_path):
     """Convert video file to MKV format"""
     ffmpeg = shutil.which('ffmpeg')
@@ -1505,6 +1250,7 @@ async def convert_to_mkv(input_path, output_path):
     
     return output_path
 
+# Update the auto_rename_files function to include title extraction
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
 @check_ban_status
 async def auto_rename_files(client, message: Message):
@@ -1512,12 +1258,8 @@ async def auto_rename_files(client, message: Message):
     user = message.from_user
 
     if ADMIN_MODE and user_id not in ADMINS:
-        return await message.reply_text("Admin mode is active - Only admins can use this bot!")
+        return await message.reply_text("Aᴅᴍɪɴ ᴍᴏᴅᴇ ɪs ᴀᴄᴛɪᴠᴇ - Oɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜɪs ʙᴏᴛ!")
     
-    autorename_enabled = await DARKXSIDE78.get_autorename_status(user_id)
-    if not autorename_enabled:
-        return await message.reply_text("🔕 Auto-Rename is turned OFF.\nUse /autorename_on to enable it.")
-
     if message.document:
         file_id = message.document.file_id
         file_name = message.document.file_name
@@ -1534,17 +1276,24 @@ async def auto_rename_files(client, message: Message):
         media_type = "audio"
         file_ext = None
     else:
-        return await message.reply_text("Unsupported file type")
-        # Ensure title is set in database
-    current_title = await DARKXSIDE78.get_title(user_id)
-    if not current_title:
-        await DARKXSIDE78.set_title(user_id, "Untitled")
+        return await message.reply_text("**Uɴsᴜᴘᴘᴏʀᴛᴇᴅ ғɪʟᴇ ᴛʏᴘᴇ**")
+        
     if user_id in active_sequences:
+        if message.document:
+            file_id = message.document.file_id
+            file_name = message.document.file_name
+        elif message.video:
+            file_id = message.video.file_id
+            file_name = f"{message.video.file_name}.mp4"
+        elif message.audio:
+            file_id = message.audio.file_id
+            file_name = f"{message.audio.file_name}.mp3"
+
         file_info = {"file_id": file_id, "file_name": file_name if file_name else "Unknown"}
         active_sequences[user_id].append(file_info)
-        await message.reply_text("File received in sequence...\nEnd Sequence by using /esequence")
+        await message.reply_text("Fɪʟᴇ ʀᴇᴄᴇɪᴠᴇᴅ ɪɴ sᴇǫᴜᴇɴᴄᴇ...\nEɴᴅ Sᴇǫᴜᴇɴᴄᴇ ʙʏ ᴜsɪɴɢ /esequence")
         return
-
+        
     async def process_file():
         nonlocal file_id, file_name, media_type, file_ext
         file_path = None
@@ -1552,15 +1301,8 @@ async def auto_rename_files(client, message: Message):
         metadata_path = None
         thumb_path = None
         output_path = None
-    
+
         try:
-            file_name = sanitize_filename(file_name)
-            ext = determine_extension(media_type, media_preference, file_ext)
-        
-            # Then use it in path construction
-            download_path = f"downloads/{file_name}"
-            metadata_path = f"metadata/{os.path.splitext(file_name)[0]}{ext}"
-            output_path = f"processed/{os.path.splitext(file_name)[0]}{ext}"
             media_preference = await DARKXSIDE78.get_media_preference(user_id)
             user_data = await DARKXSIDE78.col.find_one({"_id": user_id})
             is_premium = user_data.get("is_premium", False) if user_data else False
@@ -1576,52 +1318,53 @@ async def auto_rename_files(client, message: Message):
                         {"$set": {"is_premium": False, "premium_expiry": None}}
                     )
                     is_premium = False
-    
+
             if not is_premium:
                 current_tokens = user_data.get("token", Config.DEFAULT_TOKEN)
                 if current_tokens <= 0:
-                    await message.reply_text("You've run out of tokens!\nGenerate more by using /gentoken cmd.")
+                    await message.reply_text("**Yᴏᴜ'ᴠᴇ ʀᴜɴ ᴏᴜᴛ ᴏғ ᴛᴏᴋᴇɴs!\nGᴇɴᴇʀᴀᴛᴇ ᴍᴏʀᴇ ʙʏ ᴜsɪɴɢ /gentoken ᴄᴍᴅ.**")
                     return
             
             if PREMIUM_MODE and not is_premium:
                 current_tokens = user_data.get("token", 0)
                 if current_tokens <= 0:
-                    return await message.reply_text("You've run out of tokens!\nGenerate more by using /gentoken cmd.")
+                    return await message.reply_text("**Yᴏᴜ'ᴠᴇ ʀᴜɴ ᴏᴜᴛ ᴏғ ᴛᴏᴋᴇɴs!\nGᴇɴᴇʀᴀᴛᴇ ᴍᴏʀᴇ ʙʏ ᴜsɪɴɢ /gentoken ᴄᴍᴅ.**")
                 await DARKXSIDE78.col.update_one(
                     {"_id": user_id},
                     {"$inc": {"token": -1}}
                 )
-
+            
             format_template = await DARKXSIDE78.get_format_template(user_id)
             media_preference = await DARKXSIDE78.get_media_preference(user_id)
             metadata_source = await DARKXSIDE78.get_metadata_source(user_id)
+            
             if metadata_source == "caption" and message.caption:
                 source_text = message.caption
             else:
                 source_text = file_name
-    
+            
+            # Extract all metadata components
             season, episode = extract_season_episode(source_text)
             chapter = extract_chapter(source_text)
             volume = extract_volume(source_text)
             quality = extract_quality(source_text)
-            language = extract_language(file_name)
-            title = extract_title(source_text)
-            codec = await extract_codec(source_text, None)
-            year = extract_year(source_text)
-    
+            title = extract_title_from_filename(source_text)
+
             if not format_template:
-                return await message.reply_text("Auto rename format not set\nPlease set a rename format using /autorename")
-    
+                return await message.reply_text("**Aᴜᴛᴏ ʀᴇɴᴀᴍᴇ ғᴏʀᴍᴀᴛ ɴᴏᴛ sᴇᴛ\nPʟᴇᴀsᴇ sᴇᴛ ᴀ ʀᴇɴᴀᴍᴇ ғᴏʀᴍᴀᴛ ᴜsɪɴɢ /autorename**")
+
             if file_id in renaming_operations:
                 elapsed_time = (datetime.now() - renaming_operations[file_id]).seconds
                 if elapsed_time < 10:
                     return
-    
+
             renaming_operations[file_id] = datetime.now()
-    
+            
+            msg = await message.reply_text("**Pʀᴏᴄᴇssɪɴɢ ʏᴏᴜʀ ғɪʟᴇ...**")
+            
             try:
                 audio_label = ""
-    
+                
                 if media_type == "video" and media_preference == "document":
                     ext = ".mkv"
                 elif media_type == "document" and media_preference == "video":
@@ -1630,67 +1373,106 @@ async def auto_rename_files(client, message: Message):
                     ext = ".pdf"
                 else:
                     ext = os.path.splitext(file_name)[1] or ('.mp4' if media_type == 'video' else '.mp3')
-    
+                
                 download_path = f"downloads/{file_name}"
-                metadata_path = f"metadata/{os.path.splitext(file_name)[0]}{os.path.splitext(file_name)[1]}"
+                metadata_path = f"metadata/{file_name}"
                 output_path = f"processed/{os.path.splitext(file_name)[0]}{ext}"
-    
+                
                 await aiofiles.os.makedirs(os.path.dirname(download_path), exist_ok=True)
                 await aiofiles.os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
                 await aiofiles.os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    
-                msg = await message.reply_text("Downloading...")
+
+                await msg.edit("**Dᴏᴡɴʟᴏᴀᴅɪɴɢ...**")
                 try:
                     file_path = await client.download_media(
                         message,
                         file_name=download_path,
                         progress=progress_for_pyrogram,
-                        progress_args=("Downloading...", msg, time.time())
+                        progress_args=("**Dᴏᴡɴʟᴏᴀᴅɪɴɢ...**", msg, time.time())
                     )
                 except Exception as e:
-                    await msg.edit(f"Download failed: {e}")
+                    await msg.edit(f"Dᴏᴡɴʟᴏᴀᴅ ғᴀɪʟᴇᴅ: {e}")
                     raise
-    
-                await asyncio.sleep(1)
-                await msg.edit("Download Complete")
-                audio_info = await detect_audio_info(file_path)
-                audio_label = get_audio_label(audio_info, file_name)
-                actual_resolution = await detect_video_resolution(file_path)
-                codec = await extract_codec(file_name, file_path)
                 
+                await asyncio.sleep(1)
+                await msg.edit("**Dᴏᴡɴʟᴏᴀᴅɪɴɢ Cᴏᴍᴘʟᴇᴛᴇ**")
+                audio_info = await detect_audio_info(file_path)
+                audio_label = get_audio_label(audio_info)
+                actual_resolution = await detect_video_resolution(file_path)
+
                 replacements = {
-                    '{season}': season or '',
-                    '{episode}': episode or '',
+                    '{title}': title,
+                    '{Title}': title,
+                    '{TITLE}': title.upper(),
+                    '{season}': season or 'XX',
+                    '{episode}': episode or 'XX',
                     '{chapter}': chapter or 'XX',
                     '{volume}': volume or 'XX',
-                    '{quality}': quality or '',
-                    '{audio}': audio_label or '',
-                    '{resolution}': actual_resolution or '',
-                    '{title}': title or '',
-                    '{codec}': codec or '',
-                    '{year}': year or '',
+                    '{quality}': quality,
+                    '{audio}': audio_label,
+                    '{Season}': season or 'XX',
+                    '{Episode}': episode or 'XX',
+                    '{Chapter}': chapter or 'XX',
+                    '{Volume}': volume or 'XX',
+                    '{Quality}': quality,
+                    '{Audio}': audio_label,
+                    '{SEASON}': season or 'XX',
+                    '{EPISODE}': episode or 'XX',
+                    '{CHAPTER}': chapter or 'XX',
+                    '{VOLUME}': volume or 'XX',
+                    '{QUALITY}': quality,
+                    '{AUDIO}': audio_label,
+                    'Season': season or 'XX',
+                    'Episode': episode or 'XX',
+                    'Chapter': chapter or 'XX',
+                    'Volume': volume or 'XX',
+                    'Quality': quality,
+                    'Audio': audio_label,
+                    'SEASON': season or 'XX',
+                    'EPISODE': episode or 'XX',
+                    'CHAPTER': chapter or 'XX',
+                    'VOLUME': volume or 'XX',
+                    'QUALITY': quality,
+                    'AUDIO': audio_label,
+                    'season': season or 'XX',
+                    'episode': episode or 'XX',
+                    'chapter': chapter or 'XX',
+                    'volume': volume or 'XX',
+                    'quality': quality,
+                    'audio': audio_label,
+                    '{resolution}': actual_resolution,
+                    '{Resolution}': actual_resolution,
+                    '{RESOLUTION}': actual_resolution,
+                    'resolution': actual_resolution,
+                    'Resolution': actual_resolution,
+                    'RESOLUTION': actual_resolution,
                 }
-    
-                new_filename = format_filename(format_template, replacements)
-                if not new_filename:
-                    new_filename = "Renamed_File"
+                
+                # Apply all replacements to the format template
+                new_filename = format_template
+                for placeholder, value in replacements.items():
+                    new_filename = new_filename.replace(placeholder, value)
+                
+                new_filename = re.sub(r'[<>:"/\\|?*]', '', new_filename)  # Remove invalid filename characters
+                new_filename = re.sub(r'\s+', ' ', new_filename).strip()  # Clean up whitespace
+                
                 new_download = os.path.join("downloads", new_filename)
                 new_metadata = os.path.join("metadata", new_filename)
                 new_output = os.path.join("processed", new_filename)
-                ext = determine_extension(media_type, media_preference, file_ext)
-                new_filename += ext
+
                 await aiofiles.os.rename(download_path, new_download)
                 download_path = new_download
                 metadata_path = new_metadata
                 output_path = new_output
-                await msg.edit("Processing file...")
+
+                await msg.edit("**Pʀᴏᴄᴇssɪɴɢ ғɪʟᴇ...**")
                 
                 if media_type == "video" and media_preference == "document":
                     try:
                         await convert_to_mkv(download_path, output_path)
                         file_path = output_path
                     except Exception as e:
-                        await msg.edit(f"Video conversion failed: {e}")
+                        await msg.edit(f"Vɪᴅᴇᴏ ᴄᴏɴᴠᴇʀsɪᴏɴ ғᴀɪʟᴇᴅ: {e}")
                         raise
                 else:
                     file_path = download_path
@@ -1698,7 +1480,7 @@ async def auto_rename_files(client, message: Message):
                 if (media_type in ["video", "audio"] or 
                     (media_type == "document" and file_ext != ".pdf")):
                     try:
-                        await msg.edit("Adding metadata...")
+                        await msg.edit("**Aᴅᴅɪɴɢ ᴍᴇᴛᴀᴅᴀᴛᴀ...**")
                         await add_metadata(
                             file_path if media_type == "video" else download_path,
                             metadata_path, 
@@ -1706,7 +1488,7 @@ async def auto_rename_files(client, message: Message):
                         )
                         file_path = metadata_path
                     except Exception as e:
-                        await msg.edit(f"Metadata failed: {e}")
+                        await msg.edit(f"Mᴇᴛᴀᴅᴀᴛᴀ ғᴀɪʟᴇᴅ: {e}")
                         raise
                 else:
                     if media_type == "document" and file_ext == ".pdf":
@@ -1771,7 +1553,7 @@ async def auto_rename_files(client, message: Message):
                         await aiofiles.os.rename(download_path, output_path)
                         file_path = output_path
 
-                await msg.edit("Preparing upload...")
+                await msg.edit("**Pʀᴇᴘᴀʀɪɴɢ ᴜᴘʟᴏᴀᴅ...**")
                 await DARKXSIDE78.col.update_one(
                     {"_id": user_id},
                     {
@@ -1799,14 +1581,14 @@ async def auto_rename_files(client, message: Message):
                 elif media_type == "video" and message.video.thumbs:
                     thumb_path = await client.download_media(message.video.thumbs[0].file_id)
 
-                await msg.edit("Uploading...")
+                await msg.edit("**Uᴘʟᴏᴀᴅɪɴɢ...**")
                 try:
                     upload_params = {
                         'chat_id': message.chat.id,
                         'caption': caption,
                         'thumb': thumb_path,
                         'progress': progress_for_pyrogram,
-                        'progress_args': ("Uploading...", msg, time.time())
+                        'progress_args': ("Uᴘʟᴏᴀᴅɪɴɢ...", msg, time.time())
                     }
 
                     if file_ext in (
@@ -1815,8 +1597,8 @@ async def auto_rename_files(client, message: Message):
                         ".xml", ".html", ".json", ".md", ".log", ".ini", ".bat", ".sh"
                     ):
                         await client.send_document(
-                            document=file_path,
-                            **upload_params
+                        document=file_path,
+                        **upload_params
                         )
                     elif media_type == "video":
                         if media_preference == "video":
@@ -1862,14 +1644,14 @@ async def auto_rename_files(client, message: Message):
                             premium_status = '🗸' if is_premium else '✘'
                             
                             dump_caption = (
-                                f"» User Details «\n"
+                                f"» Usᴇʀ Dᴇᴛᴀɪʟs «\n"
                                 f"ID: {user_id}\n"
-                                f"Name: {full_name}\n"
-                                f"Username: {username}\n"
-                                f"Premium: {premium_status}\n"
-                                f"Time: {current_time}\n"
-                                f"Original Filename: {file_name}\n"
-                                f"Renamed Filename: {new_filename}"
+                                f"Nᴀᴍᴇ: {full_name}\n"
+                                f"Usᴇʀɴᴀᴍᴇ: {username}\n"
+                                f"Pʀᴇᴍɪᴜᴍ: {premium_status}\n"
+                                f"Tɪᴍᴇ: {current_time}\n"
+                                f"Oʀɪɢɪɴᴀʟ Fɪʟᴇɴᴀᴍᴇ: {file_name}\n"
+                                f"Rᴇɴᴀᴍᴇᴅ Fɪʟᴇɴᴀᴍᴇ: {new_filename}"
                             )
                             
                             dump_channel = Config.DUMP_CHANNEL
@@ -1900,40 +1682,30 @@ async def auto_rename_files(client, message: Message):
 
                     await msg.delete()
                 except Exception as e:
-                    await msg.edit(f"Upload failed: {e}")
+                    await msg.edit(f"Uᴘʟᴏᴀᴅ ғᴀɪʟᴇᴅ: {e}")
                     raise
-  
+
             except Exception as e:
                 logger.error(f"Processing error: {e}")
-                await message.reply_text(f"Error: {str(e)}")
+                await message.reply_text(f"Eʀʀᴏʀ: {str(e)}")
             finally:
                 await cleanup_files(download_path, metadata_path, thumb_path, output_path)
                 renaming_operations.pop(file_id, None)
-      
+                
         except asyncio.CancelledError:
             logger.info(f"Task for file {file_id} was cancelled")
             if file_path or download_path or metadata_path or thumb_path or output_path:
                 await cleanup_files(download_path, metadata_path, thumb_path, output_path)
             renaming_operations.pop(file_id, None)
             raise
-
+    
     status = await task_queue.get_queue_status(user_id)
     msg = await message.reply_text(
-        f"Your file has been added to queue {status['processing']}. Please Wait......."
+        f"**Yᴏᴜʀ ꜰɪʟᴇ ʜᴀs ʙᴇᴇɴ ᴀᴅᴅᴇᴅ ᴛᴏ qᴜᴇᴜᴇ {status['processing']}. Pʟᴇᴀsᴇ Wᴀɪᴛ.......**"
     )
     
     await task_queue.add_task(user_id, file_id, message, process_file())
-
-def determine_extension(media_type, media_preference, original_ext):
-    """Determine the appropriate file extension"""
-    if media_type == "video":
-        return ".mkv" if media_preference == "document" else ".mp4"
-    elif media_type == "document" and original_ext:
-        return original_ext.lower()
-    elif media_type == "audio":
-        return ".mp3"
-    return ".mp4"  # Default fallback
-
+    
 @Client.on_message(filters.command("renamed") & (filters.group | filters.private))
 @check_ban_status
 async def renamed_stats(client, message: Message):
@@ -2123,80 +1895,63 @@ async def renamed_filter_callback(client, callback_query):
 
 @Client.on_message(filters.command("info") & (filters.group | filters.private))
 @check_ban_status
-async def bot_info(client: Client, message: Message):
+async def system_info(client, message: Message):
     try:
-        # Get user statistics
+        import psutil
+        from platform import python_version, system, release
+
         total_users = await DARKXSIDE78.col.count_documents({})
-        active_users = await DARKXSIDE78.col.count_documents({
+        active_30d = await DARKXSIDE78.col.count_documents({
             "last_active": {"$gte": datetime.now() - timedelta(days=30)}
         })
-
-        # Get rename statistics
-        rename_stats = await DARKXSIDE78.col.aggregate([
+        active_24h = await DARKXSIDE78.col.count_documents({
+            "last_active": {"$gte": datetime.now() - timedelta(hours=24)}
+        })
+        
+        storage_pipeline = [
             {"$group": {
                 "_id": None,
-                "total_renames": {"$sum": "$rename_count"},
-                "total_size": {"$sum": "$total_renamed_size"}
+                "total_size": {"$sum": "$total_renamed_size"},
+                "total_files": {"$sum": "$rename_count"}
             }}
-        ]).to_list(1)
-        rename_stats = rename_stats[0] if rename_stats else {"total_renames": 0, "total_size": 0}
+        ]
+        storage_stats = await DARKXSIDE78.col.aggregate(storage_pipeline).to_list(1)
+        
+        cpu_usage = psutil.cpu_percent()
+        mem = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        boot_time = datetime.fromtimestamp(psutil.boot_time()).strftime("%Y-%m-%d %H:%M:%S")
+        
+        response = f"""
+<blockquote>╒══════════════**「 🔍 Sʏsᴛᴇᴍ Iɴғᴏ 」**══════════════╕</blockquote>
 
-        # System performance metrics
-        cpu = psutil.cpu_percent()
-        ram = psutil.virtual_memory().percent
-        disk = psutil.disk_usage('/').percent
 
-        # Uptime calculations
-        system_uptime = datetime.now() - datetime.fromtimestamp(psutil.boot_time())
-        bot_uptime = datetime.now() - datetime.fromtimestamp(psutil.Process().create_time())
+<blockquote>┍─**[Usᴇʀ Sᴛᴀᴛɪsᴛɪᴄs]**
+├─**Tᴏᴛᴀʟ Usᴇʀs = {total_users:,}**
+├─**Tᴏᴛᴀʟ Fɪʟᴇs Rᴇɴᴀᴍᴇᴅ = {storage_stats[0].get('total_files', 0) if storage_stats else 0}**
+┕─**Tᴏᴛᴀʟ Sᴛᴏʀᴀɢᴇ Usᴇᴅ = {humanbytes(storage_stats[0].get('total_size', 0)) if storage_stats else '0 B'}**</blockquote>
 
-        # Queue statistics
-        total_queued = sum(len(q) for q in task_queue.queues.values())
-        total_processing = sum(len(p) for p in task_queue.processing.values())
+<blockquote>┍─**[Sʏsᴛᴇᴍ Iɴғᴏʀᴍᴀᴛɪᴏɴ]**
+├─**OS Vᴇʀsɪᴏɴ = {system()} {release()}**
+├─**Pʏᴛʜᴏɴ Vᴇʀsɪᴏɴ = {python_version()}**
+├─**CPU Usᴀɢᴇ = {cpu_usage}%**
+├─**Mᴇᴍᴏʀʏ Usᴀɢᴇ = {humanbytes(mem.used)} / {humanbytes(mem.total)}**
+├─**Dɪsᴋ Usᴀɢᴇ = {humanbytes(disk.used)} / {humanbytes(disk.total)}**
+┕─**Uᴘᴛɪᴍᴇ = {datetime.now() - datetime.fromtimestamp(psutil.boot_time())}**</blockquote>
 
-        # Premium mode status
-        premium_status = "ON" if PREMIUM_MODE else "OFF"
-        premium_expiry = ""
-        if PREMIUM_MODE and isinstance(PREMIUM_MODE_EXPIRY, datetime):
-            premium_expiry = f" (expires {PREMIUM_MODE_EXPIRY:%Y-%m-%d %H:%M})"
-        elif PREMIUM_MODE and PREMIUM_MODE_EXPIRY is not None:
-            premium_expiry = " (invalid expiry format)"
+<blockquote>┍─**[Vᴇʀsɪᴏɴ Iɴғᴏʀᴍᴀᴛɪᴏɴ]**
+├─**Bᴏᴛ Vᴇʀsɪᴏɴ = ****{Config.VERSION}**
+├─**Lᴀsᴛ Uᴘᴅᴀᴛᴇᴅ = ****{Config.LAST_UPDATED}**
+┕─**Dᴀᴛᴀʙᴀsᴇ Vᴇʀsɪᴏɴ =** **{Config.DB_VERSION}**</blockquote>
 
-        # Format response
-        response = (
-            f"**🤖 Bot Performance Information**\n\n"
-            f"**📊 User Statistics**\n"
-            f"├ Total Users: <code>{total_users:,}</code>\n"
-            f"└ Active (30d): <code>{active_users:,}</code>\n\n"
-            f"**🔄 Rename Statistics**\n"
-            f"├ Total Files Renamed: <code>{rename_stats['total_renames']:,}</code>\n"
-            f"└ Total Storage Processed: <code>{humanbytes(rename_stats['total_size'])}</code>\n\n"
-            f"**📋 Queue Statistics**\n"
-            f"├ Queued Files: <code>{total_queued}</code>\n"
-            f"└ Processing Files: <code>{total_processing}</code>\n\n"
-            f"**🔐 Premium Mode**\n"
-            f"└ Status: <code>{premium_status}{premium_expiry}</code>\n\n"
-            f"**⚙️ System Resources**\n"
-            f"├ CPU Usage: <code>{cpu:.1f}%</code>\n"
-            f"├ RAM Usage: <code>{ram:.1f}%</code>\n"
-            f"└ Disk Usage: <code>{disk:.1f}%</code>\n\n"
-            f"**⏱️ Uptime**\n"
-            f"├ System: <code>{system_uptime.days} days, {system_uptime.seconds // 3600} hours</code>\n"
-            f"└ Bot: <code>{bot_uptime.days} days, {bot_uptime.seconds // 3600} hours</code>\n\n"
-            f"**Bot ID:** <code>@{Config.BOT_USERNAME}</code>"
-        )
-
-        # Send message with configurable auto-deletion
-        msg = await message.reply_text(response, disable_web_page_preview=True)
-        delete_timer = getattr(Config, 'INFO_DELETE_TIMER', 30)
-        if delete_timer > 0:
-            await asyncio.sleep(delete_timer)
-            await msg.delete()
+<blockquote>╘══════════════**「 {Config.BOT_NAME} 」**══════════════╛</blockquote>
+    """
+        await message.reply_text(response)
 
     except Exception as e:
-        logger.error(f"Info command error: {str(e)}", exc_info=True)
-        await message.reply_text(f"⚠️ Error generating stats: {str(e)}")
-        
+        await message.reply_text(f"Eʀʀᴏʀ: {str(e)}")
+        logger.error(f"System info error: {e}", exc_info=True)
+
 @Client.on_message(filters.command("set_pdf_banner_place"))
 @check_ban_status
 async def set_pdf_banner_place_cmd(client, message: Message):
@@ -2312,6 +2067,19 @@ async def pdf_banner_place_choose_cb(client, callback_query):
     await pdf_mode_settings(client, callback_query.message, edit=True, user_id=owner_id)
     await callback_query.answer(f"PDF ʙᴀɴɴᴇʀ ᴘʟᴀᴄᴇᴍᴇɴᴛ sᴇᴛ ᴛᴏ {placement}!", show_alert=True)
 
+@Client.on_message(filters.command("set_pdf_banner_place"))
+@check_ban_status
+async def set_pdf_banner_place_cmd(client, message: Message):
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2 or args[1].strip().lower() not in ("first", "last", "both"):
+        return await message.reply(
+            "**Usᴀɢᴇ:** `/set_pdf_banner_place first|last|both`\n"
+            "**Sᴇᴛ ᴡʜᴇʀᴇ ʏᴏᴜʀ PDF ʙᴀɴɴᴇʀ ᴡɪʟʟ ʙᴇ ᴀᴅᴅᴇᴅ ʙʏ ᴅᴇғᴀᴜʟᴛ.**"
+        )
+    placement = args[1].strip().lower()
+    await DARKXSIDE78.set_pdf_banner_placement(message.from_user.id, placement)
+    await message.reply(f"**PDF ʙᴀɴɴᴇʀ ᴘʟᴀᴄᴇᴍᴇɴᴛ sᴇᴛ ᴛᴏ:** `{placement}`")
+
 @Client.on_callback_query(filters.regex(r"^toggle_pdf_banner:(0|1)$"))
 async def toggle_pdf_banner_cb(client, callback_query):
     mode = bool(int(callback_query.matches[0].group(1)))
@@ -2335,3 +2103,4 @@ async def set_pdf_banner_cb(client, callback_query):
 @Client.on_callback_query(filters.regex(r"^set_pdf_lock_pw$"))
 async def set_pdf_lock_pw_cb(client, callback_query):
     await callback_query.answer("Sᴇɴᴅ /set_pdf_lock <password> ᴛᴏ sᴇᴛ ʏᴏᴜʀ PDF ʟᴏᴄᴋ ᴘᴀssᴡᴏʀᴅ.", show_alert=True)
+
