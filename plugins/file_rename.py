@@ -99,6 +99,7 @@ QUALITY_PATTERNS = [
 
     # Specific encoding mentions
     (re.compile(r'\b(4kX264|4kX265)\b', re.IGNORECASE), lambda m: m.group(1).upper()),
+    (re.compile(r'(480|720|1080|1440|2160)p', re.IGNORECASE), lambda m: f"{m.group(1)}p"),
 
     # Bracketed quality values like [1080p]
     (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1))
@@ -210,33 +211,40 @@ def clean_title(raw_title):
     elif not isinstance(raw_title, str):
         raw_title = str(raw_title)
 
-    # Regex cleanup — allows hyphens, apostrophes, colons, dots
+    # Normalize underscores and hyphens to spaces
+    raw_title = raw_title.replace('_', ' ').replace('-', ' ')
+
+    # Strip known uploader/channel prefixes early (e.g. @BUSTERS_OFCL_, etc.)
+    raw_title = re.sub(r'^@?[A-Z0-9_]+[\s\-]+', '', raw_title, flags=re.IGNORECASE)
+
+    # Regex cleanup — remove unwanted tags and metadata
     TITLE_CLEANING_PATTERNS_FIXED = [
-        r'@\w+',  # uploader tags
-        r'\[.*?\]', r'\(.*?\)',  # anything in [] or ()
-        r'\bS\d{1,2}[\s\-_]?E\d{1,3}\b', r'\bE\d{1,3}\b', r'\bEP\d{1,3}\b',
-        r'\b(?:480|720|1080|1440|2160)[pi]?\b', r'\d{3,4}p',
+        r'@[\w_]+', 
+        r'\b(?:sanctuary|busters|ofcl|official|culturedteluguweeb|edge)\b', 
+        r'\[.*?\]', r'\(.*?\)',                        # anything in [] or ()
+        r'\bS\d{1,2}[\s\-_]?E\d{1,3}\b',               # S01E01
+        r'\bE\d{1,3}\b', r'\bEP\d{1,3}\b',             # E01, EP01
+        r'\b(?:480|720|1080|1440|2160)[pi]?\b',        # 720p, 1080p, etc.
         r'\b(HDRip|HDTV|WEB[- ]?DL|WEB[- ]?RIP|Blu[- ]?Ray|x264|x265)\b',
         r'\b(Dub|Sub|Dual|Multi|Telugu|Hindi|Tamil|Eng|Jap|Japanese|English)\b',
         r'\bVolume[\s._-]*\d+\b', r'\bVol[\s._-]*\d+\b', r'\bV[\s._-]*\d+\b',
         r'\d+(MB|GB)\b',
-        r'\.\w{2,4}$',  # extension
-        r'[_\-]{2,}',  # multiple separators
-        r'^\s+', r'\s+$'
+        r'\.\w{2,4}$',                # file extension
+        r'[_\-]{2,}',                 # multiple separators
+        r'^\s+', r'\s+$'              # leading/trailing whitespace
     ]
 
     for pattern in TITLE_CLEANING_PATTERNS_FIXED:
         raw_title = re.sub(pattern, '', raw_title, flags=re.IGNORECASE)
 
-    # Keep hyphens, colons, apostrophes, dots – only remove dangerous special chars
-    raw_title = re.sub(r'[^\w\s\-:\'\.,/&]', '', raw_title)
+    # Final cleanup — remove leftover special characters except colon, apostrophe, hyphen, dot
+    raw_title = re.sub(r'[^\w\s\-:\'.,]', '', raw_title)
 
-
-    # Normalize spaces
-    raw_title = re.sub(r'\s{2,}', ' ', raw_title)
-    raw_title = raw_title.strip()
+    # Normalize multiple spaces
+    raw_title = re.sub(r'\s{2,}', ' ', raw_title).strip()
 
     return format_title_case(raw_title)
+
 
 def format_title_case(title):
     """Properly format title case with exceptions."""
