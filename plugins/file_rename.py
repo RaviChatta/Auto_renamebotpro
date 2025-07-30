@@ -51,29 +51,28 @@ from platform import python_version, system, release
 
 # Constants and Patterns
 
-
 SEASON_EPISODE_PATTERNS = [
-    # Most specific formats with square brackets
-    (re.compile(r'\[S(\d{1,2})[\s\-]+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),     # [S01-E06]
-    (re.compile(r'\[S(\d{1,2})[\s\-]+(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),      # [S01-06]
-    (re.compile(r'\[S(\d{1,2})\s+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),         # [S01 E06]
-    (re.compile(r'\[S\s*(\d{1,2})\s*E\s*(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),   # [S 1 E 1]
-    (re.compile(r'\[S(\d+)\]\[E(\d+)\]', re.IGNORECASE), ('season', 'episode')),               # [S01][E13]
+    # Bracketed formats
+    (re.compile(r'\[S(\d{1,2})[\s\-]+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),  # [S01-E06]
+    (re.compile(r'\[S(\d{1,2})[\s\-]+(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),   # [S01-06]
+    (re.compile(r'\[S(\d{1,2})\s+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),      # [S01 E06]
+    (re.compile(r'\[S\s*(\d{1,2})\s*E\s*(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')), # [S 1 E 1]
+    (re.compile(r'\[S(\d+)\]\[E(\d+)\]', re.IGNORECASE), ('season', 'episode')),             # [S01][E13]
+    (re.compile(r'\[S(\d{1,2})[\s\-_]*(?:E|EP|Episode)[\s\-_]*(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),
     
-    # Formats without brackets
-    (re.compile(r'\bS(\d{1,2})[\s\-_]*(?:E|EP|Episode)[\s\-_]*(\d{1,3})\b', re.IGNORECASE), ('season', 'episode')),  # S01E13, S01-E13, etc.
-    (re.compile(r'\bS(\d{1,2})[\s\-_]*(\d{1,3})\b', re.IGNORECASE), ('season', 'episode')),  # S01-13, S01 13
-    (re.compile(r'\b(\d{1,2})x(\d{1,3})\b', re.IGNORECASE), ('season', 'episode')),         # 01x13
-    
-    # Season and episode separated by space or hyphen
-    (re.compile(r'\bS(\d{1,2})\s+E(\d{1,3})\b', re.IGNORECASE), ('season', 'episode')),     # S01 E06
-    (re.compile(r'\bS(\d{1,2})\s+(\d{1,3})\b', re.IGNORECASE), ('season', 'episode')),      # S01 06
+    # Unbracketed formats
+    (re.compile(r'\bS(\d{1,2})[\s\-_]*(?:E|EP|Episode)[\s\-_]*(\d{1,3})\b', re.IGNORECASE), ('season', 'episode')),
+    (re.compile(r'\bS(\d{1,2})[\s\-_]*(\d{1,3})\b', re.IGNORECASE), ('season', 'episode')),
+    (re.compile(r'\b(\d{1,2})x(\d{1,3})\b', re.IGNORECASE), ('season', 'episode')),
+    (re.compile(r'\bS(\d{1,2})\s+E(\d{1,3})\b', re.IGNORECASE), ('season', 'episode')),
+    (re.compile(r'\bS(\d{1,2})\s+(\d{1,3})\b', re.IGNORECASE), ('season', 'episode')),
     
     # Episode-only formats
-    (re.compile(r'\b(?:Episode|EP)[\s\-_]*(\d{1,3})\b', re.IGNORECASE), (None, 'episode')), # Episode 13, EP-13
-    (re.compile(r'\b(?:E|EP|Episode)\s*(\d+)\b', re.IGNORECASE), (None, 'episode')),        # E13, EP13
-    (re.compile(r'\b(\d{1,3})\b'), (None, 'episode'))                                       # Fallback: just a number
+    (re.compile(r'\b(?:Episode|EP)[\s\-_]*(\d{1,3})\b', re.IGNORECASE), (None, 'episode')),
+    (re.compile(r'\b(?:E|EP|Episode)\s*(\d+)\b', re.IGNORECASE), (None, 'episode')),
+    (re.compile(r'\b(\d{1,3})\b'), (None, 'episode'))
 ]
+
 
 
 QUALITY_PATTERNS = [
@@ -143,6 +142,41 @@ def parse_duration(arg):
     elif arg.isdigit():
         return int(arg)
     return None
+    
+def clean_filename(filename):
+    if not filename:
+        return "Unknown.mkv"
+    
+    # Remove file extension temporarily
+    file_ext = re.search(r'\.\w+$', filename)
+    ext = file_ext.group(0) if file_ext else '.mkv'
+    filename_no_ext = re.sub(r'\.\w+$', '', filename)
+    
+    # Extract quality
+    quality = extract_quality(filename_no_ext)
+    
+    # Extract languages
+    languages = extract_languages(filename_no_ext)
+    
+    # Extract season and episode
+    season, episode, title = extract_season_episode_title(filename_no_ext)
+    
+    # Clean up title
+    title = clean_title(title)
+    
+    # Build new filename
+    parts = []
+    if title:
+        parts.append(title)
+    if season and episode:
+        parts.append(f"[S{season} - E{episode}]")
+    if quality and quality != "Unknown":
+        parts.append(f"[{quality}]")
+    if languages:
+        parts.append(f"[{' '.join(languages)}]")
+    
+    new_filename = " - ".join(parts) + ext
+    return new_filename
 def extract_quality(filename):
     """Extract and normalize video quality from a filename using regex patterns and quality map."""
     if not filename:
@@ -181,61 +215,82 @@ def extract_quality(filename):
 
     return " ".join(quality_parts) if quality_parts else "Unknown"
 
-def clean_title(raw_title):
-    """Clean and format the extracted title."""
-    if not raw_title:
-        return "Unknown"
-
-    if isinstance(raw_title, (tuple, list)):
-        raw_title = " ".join(str(x) for x in raw_title)
-    elif not isinstance(raw_title, str):
-        raw_title = str(raw_title)
-
-    # Normalize underscores and hyphens to spaces
-    raw_title = raw_title.replace('_', ' ').replace('-', ' ')
-
-    # Remove uploader tags and metadata
-    for pattern in TITLE_CLEANING_PATTERNS:
-        raw_title = pattern.sub(' ', raw_title)
-
-    # Remove common words that aren't part of the actual title
-    common_words = ['complete', 'full', 'uncut', 'remastered', 'extended',
-                   'dual', 'multi', 'proper', 'repack', 'rerip',
-                   'limited', 'special edition', 'directors cut',
-                   'webdl', 'webrip', 'bluray', 'bdrip', 'brrip',
-                   'dvdrip', 'hdtv', 'hdr', 'uhd', '4k', '1080p', '720p']
+def extract_languages(filename):
+    language_map = {
+        'telugu': 'Telugu',
+        'tamil': 'Tamil',
+        'hindi': 'Hindi',
+        'eng': 'Eng',
+        'jpn': 'Jpn',
+        'sub': 'Sub',
+        'dub': 'Dub',
+        'dual': 'Dual',
+        'multi': 'Multi'
+    }
     
-    words = raw_title.split()
-    words = [word for word in words if word.lower() not in common_words]
-    raw_title = ' '.join(words)
+    languages = set()
+    for lang in language_map:
+        if re.search(rf'\b{lang}\b', filename, re.IGNORECASE):
+            languages.add(language_map[lang])
+    
+    return sorted(languages) if languages else []
 
-    # Final cleanup - remove leftover special characters and normalize spaces
-    raw_title = re.sub(r'[^\w\s]', '', raw_title)
-    raw_title = re.sub(r'\s+', ' ', raw_title).strip()
-
-    return format_title_case(raw_title)
-
-def format_title_case(title):
-    """Properly format title case with exceptions."""
+def clean_title(title):
     if not title:
         return ""
+    
+    # Remove uploader tags (@Animes_Edge, @BUSTERS_OFCL_)
+    title = re.sub(r'@[\w_]+', '', title, flags=re.IGNORECASE)
+    
+    # Remove special characters except spaces and colons
+    title = re.sub(r'[^\w\s:]', ' ', title)
+    
+    # Remove common metadata words
+    metadata_words = {
+        'complete', 'full', 'uncut', 'remastered', 'extended',
+        'proper', 'repack', 'rerip', 'limited', 'special', 'edition',
+        'directors', 'cut', 'webdl', 'webrip', 'bluray', 'bdrip',
+        'brrip', 'dvdrip', 'hdtv', 'hdr', 'uhd', '4k', '1080p', '720p',
+        'x264', 'x265', 'hevc', 'aac', 'ac3', 'dts'
+    }
+    
+    words = title.split()
+    words = [word for word in words if word.lower() not in metadata_words]
+    title = ' '.join(words)
+    
+    # Normalize spaces
+    title = re.sub(r'\s+', ' ', title).strip()
+    
+    # Title case formatting
+    return format_title_case(title)
 
+def format_title_case(title):
+    if not title:
+        return ""
+    
     lowercase_words = {
         'a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on',
         'at', 'to', 'from', 'by', 'of', 'in', 'with', 'as', 'is', 'no'
     }
-
+    
     words = title.split()
     if not words:
         return ""
-
+    
     formatted_words = []
     for i, word in enumerate(words):
         if i > 0 and word.lower() in lowercase_words:
             formatted_words.append(word.lower())
         else:
-            formatted_words.append(word[0].upper() + word[1:].lower() if len(word) > 1 else word.upper())
-
+            if '-' in word:
+                # Handle hyphenated words
+                parts = word.split('-')
+                parts = [p[0].upper() + p[1:].lower() if len(p) > 1 else p.upper() for p in parts]
+                word = '-'.join(parts)
+            else:
+                word = word[0].upper() + word[1:].lower() if len(word) > 1 else word.upper()
+            formatted_words.append(word)
+    
     return ' '.join(formatted_words)
 def extract_title_from_filename(filename):
     """Extract rough title from filename by stripping known junk."""
