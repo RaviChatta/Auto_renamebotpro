@@ -162,6 +162,43 @@ def parse_duration(arg):
     elif arg.isdigit():
         return int(arg)
     return None
+def extract_quality(filename):
+    """Extract and normalize video quality from a filename using regex patterns and quality map."""
+    if not filename:
+        return "Unknown"
+
+    quality_map = {
+        '480p': '480p',
+        '720p': '720p',
+        '1080p': '1080p',
+        '1440p': '1440p',
+        '2160p': '2160p',
+        '4k': '2160p',
+        'hdr': 'HDR',
+        'hdrip': 'HDRip',
+        'hdtv': 'HDTV',
+        'webdl': 'WEB-DL',
+        'webrip': 'WEBRip',
+        'bluray': 'BluRay',
+        'blu-ray': 'BluRay',
+        'web-dl': 'WEB-DL',
+        'web-rip': 'WEBRip'
+    }
+
+    seen = set()
+    quality_parts = []
+
+    for pattern, extractor in QUALITY_PATTERNS:
+        match = pattern.search(filename)
+        if match:
+            raw_quality = extractor(match).lower()
+            normalized = quality_map.get(raw_quality, raw_quality.upper())
+            if normalized not in seen:
+                quality_parts.append(normalized)
+                seen.add(normalized)
+                filename = filename.replace(match.group(0), '', 1)  # Avoid re-matching same string
+
+    return " ".join(quality_parts) if quality_parts else "Unknown"
 
 def clean_title(raw_title):
     """Clean and format the extracted title."""
@@ -175,23 +212,25 @@ def clean_title(raw_title):
 
     # Regex cleanup — allows hyphens, apostrophes, colons, dots
     TITLE_CLEANING_PATTERNS_FIXED = [
-        r'@\w+',  # uploader
+        r'@\w+',  # uploader tags
         r'\[.*?\]', r'\(.*?\)',  # anything in [] or ()
-        r'\bS\d{1,2}[-_ ]?E\d{1,3}\b', r'\bE\d{1,3}\b', r'\bEP\d{1,3}\b',
-        r'\d{3,4}p', r'\b(480|720|1080|2160|1440)[pi]?\b',
-        r'\b(HDRip|HDTV|WEB[- ]?DL|WEB[- ]?RIP|Blu[- ]?Ray)\b',
-        r'\b(Dub|Sub|Dual|Multi)\b',
-        r'\bVolume\s*\d+\b', r'\bVol\s*\d+\b', r'\bV\s*\d+\b',
-        r'\d+MB', r'\d+GB',
-        r'\.\w{2,4}$',  # file extension
+        r'\bS\d{1,2}[\s\-_]?E\d{1,3}\b', r'\bE\d{1,3}\b', r'\bEP\d{1,3}\b',
+        r'\b(?:480|720|1080|1440|2160)[pi]?\b', r'\d{3,4}p',
+        r'\b(HDRip|HDTV|WEB[- ]?DL|WEB[- ]?RIP|Blu[- ]?Ray|x264|x265)\b',
+        r'\b(Dub|Sub|Dual|Multi|Telugu|Hindi|Tamil|Eng|Jap|Japanese|English)\b',
+        r'\bVolume[\s._-]*\d+\b', r'\bVol[\s._-]*\d+\b', r'\bV[\s._-]*\d+\b',
+        r'\d+(MB|GB)\b',
+        r'\.\w{2,4}$',  # extension
         r'[_\-]{2,}',  # multiple separators
+        r'^\s+', r'\s+$'
     ]
 
     for pattern in TITLE_CLEANING_PATTERNS_FIXED:
         raw_title = re.sub(pattern, '', raw_title, flags=re.IGNORECASE)
 
     # Keep hyphens, colons, apostrophes, dots – only remove dangerous special chars
-    raw_title = re.sub(r'[^\w\s\-:\'.,]', '', raw_title)    
+    raw_title = re.sub(r'[^\w\s\-:\'\.,/&]', '', raw_title)
+
 
     # Normalize spaces
     raw_title = re.sub(r'\s{2,}', ' ', raw_title)
@@ -230,15 +269,12 @@ def extract_title_from_filename(filename):
     filename = filename.replace('_', ' ').replace('-', ' ')
     return clean_title(filename)
 def extract_season_episode_title(filename):
-    """
-    Extract season, episode, and title using SEASON_EPISODE_PATTERNS.
-    Returns: season, episode, cleaned_title
-    """
+    """Extract season, episode, and cleaned title from filename"""
     if not filename:
         return "01", "01", "Unknown"
 
-    filename = re.sub(r'\.[^\.]+$', '', filename)
-    filename = filename.replace('_', ' ')
+    filename = re.sub(r'\.[^\.]+$', '', filename)  # remove .mkv/.mp4/etc
+    filename = filename.replace('_', ' ').replace('-', ' ')
 
     for pattern, (season_group, episode_group) in SEASON_EPISODE_PATTERNS:
         match = pattern.search(filename)
@@ -246,53 +282,14 @@ def extract_season_episode_title(filename):
             season = match.group(1).zfill(2) if season_group else "01"
             episode = match.group(2 if season_group else 1).zfill(2)
 
-            # Extract the title by removing matched part
-            title_part = filename[:match.start()] + filename[match.end():]
+            title_part = (filename[:match.start()] + " " + filename[match.end():]).strip()
             return season, episode, clean_title(title_part)
 
-    # Fallback: try to guess episode
+    # fallback episode only
     ep_match = re.search(r'\b(\d{1,3})\b', filename)
     episode = ep_match.group(1).zfill(2) if ep_match else "01"
     return "01", episode, clean_title(filename)
 
-
-def extract_quality(filename):
-    """Extract and normalize video quality from a filename using regex patterns and quality map."""
-    if not filename:
-        return "Unknown"
-
-    quality_map = {
-        '480p': '480p',
-        '720p': '720p',
-        '1080p': '1080p',
-        '1440p': '1440p',
-        '2160p': '2160p',
-        '4k': '2160p',
-        'hdr': 'HDR',
-        'hdrip': 'HDRip',
-        'hdtv': 'HDTV',
-        'webdl': 'WEB-DL',
-        'webrip': 'WEBRip',
-        'bluray': 'BluRay',
-        'blu-ray': 'BluRay',
-        'web-dl': 'WEB-DL',
-        'web-rip': 'WEBRip'
-    }
-
-    seen = set()
-    quality_parts = []
-
-    for pattern, extractor in QUALITY_PATTERNS:
-        match = pattern.search(filename)
-        if match:
-            raw_quality = extractor(match).lower()
-            normalized = quality_map.get(raw_quality, raw_quality.upper())
-            if normalized not in seen:
-                quality_parts.append(normalized)
-                seen.add(normalized)
-                filename = filename.replace(match.group(0), '', 1)  # Avoid re-matching same string
-
-    return " ".join(quality_parts) if quality_parts else "Unknown"
 
 def extract_chapter(filename): 
     """Extract chapter number from filename"""
