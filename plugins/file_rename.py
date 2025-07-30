@@ -50,30 +50,57 @@ import psutil
 from platform import python_version, system, release
 
 # Constants and Patterns
+
+
 SEASON_EPISODE_PATTERNS = [
-    (re.compile(r'\[S(\d{1,2})[\s\-]+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),   # [S01-E06]
-    (re.compile(r'\[S(\d{1,2})[\s\-]+(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),     # [S01-06]
-    (re.compile(r'\[S(\d{1,2})\s+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),        # [S01 E06]
-    (re.compile(r'\[S\s*(\d{1,2})\s*E\s*(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')), # [S 1 E 1]
-    (re.compile(r'S(\d{1,2})[\s\-]+E(\d{1,3})', re.IGNORECASE), ('season', 'episode')),        # S01-E06, S01 E06
-    (re.compile(r'S(\d{1,2})[\s\-]+(\d{1,3})', re.IGNORECASE), ('season', 'episode')),         # S01-06, S01 06
-    (re.compile(r'S(\d+)(?:E|EP)(\d+)'), ('season', 'episode')),
-    (re.compile(r'S(\d+)[\s-]*(?:E|EP)(\d+)'), ('season', 'episode')),
-    (re.compile(r'Season\s*(\d+)\s*Episode\s*(\d+)', re.IGNORECASE), ('season', 'episode')),
-    (re.compile(r'\[S(\d+)\]\[E(\d+)\]'), ('season', 'episode')),
-    (re.compile(r'S(\d+)[^\d]+(\d{1,3})\b'), ('season', 'episode')),
-    (re.compile(r'(?:E|EP|Episode)\s*(\d+)', re.IGNORECASE), (None, 'episode')),
-    (re.compile(r'\b(\d{1,3})\b'), (None, 'episode'))
+    # Most specific formats with square brackets
+    (re.compile(r'\[S(\d{1,2})[\s\-]+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),     # [S01-E06]
+    (re.compile(r'\[S(\d{1,2})[\s\-]+(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),      # [S01-06]
+    (re.compile(r'\[S(\d{1,2})\s+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),         # [S01 E06]
+    (re.compile(r'\[S\s*(\d{1,2})\s*E\s*(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),   # [S 1 E 1]
+    (re.compile(r'\[S(\d+)\]\[E(\d+)\]'), ('season', 'episode')),                               # [S01][E13]
+    (re.compile(r'\[?S(\d{1,2})[\s\-_]*(?:E|EP|Episode)[\s\-_]*(\d{1,3})\]?', re.IGNORECASE), ('season', 'episode')),  # S01E13, S01-E13, etc.
+    (re.compile(r'(?:\[|^)S(\d{1,2})[\s\-_]*(\d{1,3})(?:\]|\b)', re.IGNORECASE), ('season', 'episode')),  # [S01-13], S01-13
+    (re.compile(r'(?:\[|^)(\d{1,2})x(\d{1,3})(?:\]|\b)', re.IGNORECASE), ('season', 'episode')), # [01x13], 01x13
+
+    # Less strict formats
+    (re.compile(r'S(\d{1,2})[\s\-]+E(\d{1,3})', re.IGNORECASE), ('season', 'episode')),          # S01-E06, S01 E06
+    (re.compile(r'S(\d{1,2})[\s\-]+(\d{1,3})', re.IGNORECASE), ('season', 'episode')),           # S01-06, S01 06
+    (re.compile(r'S(\d+)(?:E|EP)(\d+)', re.IGNORECASE), ('season', 'episode')),                 # S1E13, S1EP13
+    (re.compile(r'S(\d+)[\s\-_]*(?:E|EP)(\d+)', re.IGNORECASE), ('season', 'episode')),         # S1 E13, S1-EP13
+    (re.compile(r'Season\s*(\d+)\s*Episode\s*(\d+)', re.IGNORECASE), ('season', 'episode')),     # Season 1 Episode 13
+    (re.compile(r'S(\d+)[^\d]+(\d{1,3})\b', re.IGNORECASE), ('season', 'episode')),              # S01.13 or S01x13
+
+    # Episode-only formats
+    (re.compile(r'(?:Episode|EP)[\s\-_]*(\d{1,3})\b', re.IGNORECASE), (None, 'episode')),        # Episode 13, EP-13
+    (re.compile(r'(?:E|EP|Episode)\s*(\d+)', re.IGNORECASE), (None, 'episode')),                 # E13, EP13
+    (re.compile(r'\b(\d{1,3})\b'), (None, 'episode'))                                            # Fallback: just a number
 ]
 
+
+import re
+
 QUALITY_PATTERNS = [
+    # Explicit formats in brackets: [1080p], [720p], etc.
     (re.compile(r'\[(\d{3,4}p)\](?:\s*\[\1\])*', re.IGNORECASE), lambda m: m.group(1)),
+
+    # Plain 3-4 digit resolutions, with or without 'p'
     (re.compile(r'\b(\d{3,4})p?\b'), lambda m: f"{m.group(1)}p"),
+
+    # Explicit 4K and 2K mentions
     (re.compile(r'\b(4k|2160p)\b', re.IGNORECASE), lambda m: "2160p"),
     (re.compile(r'\b(2k|1440p)\b', re.IGNORECASE), lambda m: "1440p"),
+
+    # 480i, 1080i, 1080p, etc.
     (re.compile(r'\b(\d{3,4}[pi])\b', re.IGNORECASE), lambda m: m.group(1)),
-    (re.compile(r'\b(HDRip|HDTV)\b', re.IGNORECASE), lambda m: m.group(1)),
-    (re.compile(r'\b(4kX264|4kx265)\b', re.IGNORECASE), lambda m: m.group(1)),
+
+    # Media source terms
+    (re.compile(r'\b(HDRip|HDTV|WEB[- ]?DL|WEB[- ]?RIP|Blu[- ]?Ray)\b', re.IGNORECASE), lambda m: m.group(1).replace('-', '').upper()),
+
+    # Specific encoding mentions
+    (re.compile(r'\b(4kX264|4kX265)\b', re.IGNORECASE), lambda m: m.group(1).upper()),
+
+    # Bracketed quality values like [1080p]
     (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1))
 ]
 
@@ -87,6 +114,15 @@ TITLE_CLEANING_PATTERNS = [
         r'x\d{3,4}', r'HDR', r'DTS', r'AAC', r'AC3',
         r'\[(Sub|Dub|Dual Audio)\]', r'\[(Tam|Tel|Hin|Mal|Kan|Eng|Jpn)\]',
         r'\[.*?\]', r'\(.*?\)', r'v\d', r'[\-_]', r'\d+MB', r'\d+GB',
+        r'@\w+',  # Uploader tags
+        r'\[.*?\]',  # Anything in brackets
+        r'\(.*?\)',  # Anything in parentheses
+        r'[_\-\s]+$',  # Trailing separators
+        r'^\s+',  # Leading spaces
+        r'\s+',  # Multiple spaces
+        r'\.\w{2,4}$',  # File extensions
+        r'\b(?:480p|720p|1080p|4K|HDR|WEB|DL|Rip|Sub|Dub|Dual)\b',
+        r'[^\w\s]',  # Special chars except spaces
         r'\.\w{2,4}$', r'\d+p', r'x\d{3,4}'
     ]
 ]
@@ -140,14 +176,24 @@ def clean_title(raw_title):
     for pattern in TITLE_CLEANING_PATTERNS:
         raw_title = pattern.sub('', raw_title)
 
-    for word in COMMON_WORDS_TO_REMOVE:
-        raw_title = re.sub(rf'\b{re.escape(word)}\b', '', raw_title, flags=re.IGNORECASE)
+ 
+    # Convert to title case with special handling
+    words = raw_title.split()
+    formatted = []
+    for i, word in enumerate(words):
+        if i > 0 and word.lower() in {'a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on', 'at', 'to'}:
+            formatted.append(word.lower())
+        else:
+            # Handle special cases like "No." in "Kaiju No. 8"
+            if '-' in word:
+                parts = [p.capitalize() for p in word.split('-')]
+                formatted.append('-'.join(parts))
+            elif word.upper() == word:
+                formatted.append(word)
+            else:
+                formatted.append(word.capitalize())
     
-    raw_title = re.sub(r'[^\w\s]', ' ', raw_title)
-    raw_title = re.sub(r'\s+', ' ', raw_title).strip()
-    
-    return format_title_case(raw_title) if raw_title else "Unknown"
-
+    return ' '.join(formatted)
 def format_title_case(title):
     """Properly format title case with exceptions"""
     if not title:
@@ -262,28 +308,54 @@ def extract_season_episode(filename):
                 season = match.group(1).zfill(2) if match.group(1) else "01"
             if episode_group:
                 episode = match.group(2 if season_group else 1).zfill(2)
+            # Extract title by removing matched pattern and cleaning
+            title_part = filename[:match.start()] + filename[match.end():]
+            title = clean_title(title_part)
             
             return season or "01", episode, title
     
-    return "01", None, title
+    # If no pattern matched, try to extract just episode from filename
+    ep_match = re.search(r'\b(\d{1,3})\b', filename)
+    episode = ep_match.group(1).zfill(2) if ep_match else None
+    
+    return "01", episode, clean_title(filename)
 
 def extract_quality(filename):
-    """Extract quality information from filename"""
+    """Extract and normalize video quality from a filename using regex patterns and quality map."""
     if not filename:
         return "Unknown"
-    
+
+    quality_map = {
+        '480p': '480p',
+        '720p': '720p',
+        '1080p': '1080p',
+        '1440p': '1440p',
+        '2160p': '2160p',
+        '4k': '2160p',
+        'hdr': 'HDR',
+        'hdrip': 'HDRip',
+        'hdtv': 'HDTV',
+        'webdl': 'WEB-DL',
+        'webrip': 'WEBRip',
+        'bluray': 'BluRay',
+        'blu-ray': 'BluRay',
+        'web-dl': 'WEB-DL',
+        'web-rip': 'WEBRip'
+    }
+
     seen = set()
     quality_parts = []
-    
+
     for pattern, extractor in QUALITY_PATTERNS:
         match = pattern.search(filename)
         if match:
-            quality = extractor(match).lower()
-            if quality not in seen:
-                quality_parts.append(quality)
-                seen.add(quality)
-                filename = filename.replace(match.group(0), '', 1)
-    
+            raw_quality = extractor(match).lower()
+            normalized = quality_map.get(raw_quality, raw_quality.upper())
+            if normalized not in seen:
+                quality_parts.append(normalized)
+                seen.add(normalized)
+                filename = filename.replace(match.group(0), '', 1)  # Avoid re-matching same string
+
     return " ".join(quality_parts) if quality_parts else "Unknown"
 
 def extract_chapter(filename): 
