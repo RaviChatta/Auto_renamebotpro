@@ -901,165 +901,141 @@ def format_title_case(title):
                 formatted_words.append(word[0].upper() + word[1:].lower())
     
     return ' '.join(formatted_words)
-
 def extract_title_from_filename(filename):
-    """Improved filename parser for anime and general media files"""
+    """Enhanced filename parser with better anime support"""
     if not filename:
         return "Unknown"
     
-    # Remove file extension
+    # Remove file extension and clean filename
     filename = re.sub(r'\.[^\.]+$', '', filename)
-
+    filename = re.sub(r'\[.*?\]', ' ', filename)  # Remove all bracket contents first
+    filename = re.sub(r'@\w+', '', filename)      # Remove uploader tags
+    filename = re.sub(r'[\(\)]', ' ', filename)   # Replace parentheses with spaces
+    
     # -------------------------
-    # 1. Anime-specific patterns
+    # 1. Anime-specific patterns (priority)
     # -------------------------
     anime_patterns = [
-        r'^[Ss](\d+)[\.\-_ ]*[Ee](\d+)[\.\-_ ]*(.*?)(?:[\.\-_ ]+(?:480p|720p|1080p).*)?$',  # S01E03_Title
-        r'^(\d+)x(\d+)_([^_]+)(?:_(.*))?',        # 01x03_Title_...
-        r'^(\d+)_(\d+)_([^_]+)(?:_(.*))?',        # 01_03_Title_...
-        r'^S(\d+)_?E(\d+)_([^_]+)(?:_(.*))?',     # S01_E03_Title_...
+        r'(?:\[.*?\])?\s*(.*?)\s*[Ss](\d+)[\s\-_]*[Ee](\d+)\b',
+        r'(.*?)\s*[\-\s_](\d+)x(\d+)\b',
+        r'[Ss](\d+)[\s\-_]*[Ee](\d+)[\s\-_]*(.*?)(?:\s+\[|\s+\d{3,4}p|$)',
+        r'(.*?)\s*[Ss](\d+)[\s\-_]*[Ee](\d+)\b',
+        r'\[?[Ss](\d{1,2})[-_](\d{2})\]?\s*(.*?)(?:\s+\[|\s+\d{3,4}p|$)',
+        r'[Ss](\d{1,2})[_\-]?[Ee](\d{1,2})[_\-]+([A-Za-z0-9:_\-\s]+?)(?=[_\-]+\d{3,4}p|[_\-]+Sub|[_\-]+Dub|$)'
     ]
+
     
     for pattern in anime_patterns:
-        match = re.match(pattern, filename, re.IGNORECASE)
+        match = re.search(pattern, filename, re.IGNORECASE)
         if match:
-            title_part = match.group(3) if len(match.groups()) >= 3 else filename
-            title = re.sub(r'[_\-\:\.]+', ' ', title_part)
-            title = re.sub(r'\s+', ' ', title).strip()
-            if title:
+            title = match.group(1) if 'x' in pattern else match.group(3) if match.lastindex >= 3 else match.group(0)
+            title = re.sub(r'[\-\_]', ' ', title).strip()
+            if title and title != "Unknown":
                 return format_title_case(title)
 
     # -------------------------
-    # 2. Bracket-based extraction
+    # 2. Enhanced bracket-based extraction
     # -------------------------
-    bracket_match = re.search(r'\[([^\]]+)\]', filename)
+    bracket_match = re.search(r'\]\s*([^\[\]]+?)\s*(?:\d{3,4}p|\[|$)', filename)
     if bracket_match:
-        potential_title = bracket_match.group(1)
-        if (len(potential_title.split()) > 1 and 
-            not any(word in potential_title.lower() for word in COMMON_WORDS_TO_REMOVE)):
+        potential_title = bracket_match.group(1).strip()
+        if len(potential_title.split()) > 1:
             return clean_title(potential_title)
 
     # -------------------------
-    # 3. General fallback patterns
+    # 3. Quality-based separation
     # -------------------------
-    patterns = [
-        r'^(.*?)(?:\s*[-_]\s*[\[\(]|\[|\()',  # Before first [ or (
-        r'^(.*?)(?:\s+[\[\(]|$)',             # Before first [ or ( or end
-        r'^(.*?)(?:\s+\d{3,4}p|$)',           # Before resolution or end
-        r'^(.*?)(?:\s+[Ss]\d{1,2}|$)'         # Before season or end
-    ]
-    
-    for pattern in patterns:
-        match = re.search(pattern, filename)
-        if match:
-            potential_title = match.group(1)
-            if potential_title and len(potential_title.split()) >= 1:
-                return clean_title(potential_title)
+    quality_match = re.search(r'(.*?)\s*(?:\d{3,4}p|WEB|BluRay|HDRip)', filename, re.IGNORECASE)
+    if quality_match:
+        potential_title = quality_match.group(1).strip()
+        if potential_title:
+            return clean_title(potential_title)
 
     # -------------------------
-    # 4. Fallback to full cleaning
+    # 4. Fallback patterns
     # -------------------------
+    fallback_patterns = [
+        r'^(.*?)(?:\s+-\s+\d+|$)',      # Before episode number
+        r'^(.*?)(?:\s+\(\d{4}\)|$)',    # Before year
+        r'^(.*?)(?:\s+\d{3,4}p|$)',     # Before quality
+        r'^(.*?)(?:\s+[Ss]\d|$)'        # Before season
+    ]
+    
+    for pattern in fallback_patterns:
+        match = re.search(pattern, filename)
+        if match:
+            potential_title = match.group(1).strip()
+            if potential_title:
+                return clean_title(potential_title)
+
+    # Final cleanup
     return clean_title(filename)
 
 def extract_season_episode(filename):
-    # Remove only (parentheses), not [brackets]
-    filename = re.sub(r'\(.*?\)', ' ', filename)
+    """Enhanced season/episode extraction"""
+    # Try anime patterns first
+    anime_patterns = [
+        (r'\[S(\d+)-(\d+)\]', ('season', 'episode')),          # [S01-03]
+        (r'[Ss](\d+)[\s\-_]*[Ee](\d+)', ('season', 'episode')), # S01E03
+        (r'(\d+)x(\d+)', ('season', 'episode')),               # 01x03
+        (r'(\d+)[\s\-_](\d+)', ('season', 'episode')),         # 01 03 or 01-03
+        (r'EP?(\d+)', (None, 'episode'))                       # EP03 or E03
+    ]
     
-    for pattern, (season_group, episode_group) in SEASON_EPISODE_PATTERNS:
-        match = pattern.search(filename)
+    for pattern, groups in anime_patterns:
+        match = re.search(pattern, filename)
         if match:
-            season = episode = None
-            if season_group:
-                season = match.group(1).zfill(2) if match.group(1) else "01"
-            if episode_group:
-                episode = match.group(2 if season_group else 1).zfill(2)
-            
-            logger.info(f"Extracted season: {season}, episode: {episode} from {filename}")
-            return season or "01", episode
+            season = match.group(1).zfill(2) if groups[0] else "01"
+            episode = match.group(2 if groups[0] else 1).zfill(2)
+            return season, episode
     
-    logger.warning(f"No season/episode pattern matched for {filename}")
-    return "01", None
+    # Fallback to standard patterns
+    return "01", "01"
 
 def extract_quality(filename):
-    seen = set()
-    quality_parts = []
+    """Enhanced quality detection"""
+    quality_map = {
+        r'\b2160p\b': '4K',
+        r'\b4k\b': '4K',
+        r'\b1080p\b': '1080p',
+        r'\b720p\b': '720p',
+        r'\b480p\b': '480p',
+        r'\bHDTV\b': 'HDTV',
+        r'\bWEB-?DL\b': 'WEB-DL',
+        r'\bBlu-?Ray\b': 'BluRay',
+        r'\bHDR\b': 'HDR'
+    }
     
-    for pattern, extractor in QUALITY_PATTERNS:
-        match = pattern.search(filename)
-        if match:
-            quality = extractor(match).lower()
-            if quality not in seen:
-                quality_parts.append(quality)
-                seen.add(quality)
-                filename = filename.replace(match.group(0), '', 1)
+    qualities = []
+    for pattern, quality in quality_map.items():
+        if re.search(pattern, filename, re.IGNORECASE):
+            qualities.append(quality)
     
-    return " ".join(quality_parts) if quality_parts else "Unknown"
+    return " ".join(qualities) if qualities else ""
 
-
-async def detect_audio_info(file_path):
-    ffprobe = shutil.which('ffprobe')
-    if not ffprobe:
-        raise RuntimeError("ffprobe not found in PATH")
-
-    cmd = [
-        ffprobe,
-        '-v', 'quiet',
-        '-print_format', 'json',
-        '-show_streams',
-        file_path
-    ]
-
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    stdout, stderr = await process.communicate()
-
-    try:
-        info = json.loads(stdout)
-        streams = info.get('streams', [])
-        
-        audio_streams = [s for s in streams if s.get('codec_type') == 'audio']
-        sub_streams = [s for s in streams if s.get('codec_type') == 'subtitle']
-
-        japanese_audio = 0
-        english_audio = 0
-        for audio in audio_streams:
-            lang = audio.get('tags', {}).get('language', '').lower()
-            if lang in {'ja', 'jpn', 'japanese'}:
-                japanese_audio += 1
-            elif lang in {'en', 'eng', 'english'}:
-                english_audio += 1
-
-        english_subs = len([
-            s for s in sub_streams 
-            if s.get('tags', {}).get('language', '').lower() in {'en', 'eng', 'english'}
-        ])
-
-        return len(audio_streams), len(sub_streams), japanese_audio, english_audio, english_subs
-    except Exception as e:
-        logger.error(f"Audio detection error: {e}")
-        return 0, 0, 0, 0, 0
-
-def get_audio_label(audio_info):
-    audio_count, sub_count, jp_audio, en_audio, en_subs = audio_info
+def get_audio_label(filename, audio_info=None):
+    """Enhanced audio detection from filename and streams"""
+    audio_tags = []
     
-    if audio_count == 1:
-        if jp_audio >= 1 and en_subs >= 1:
-            return "Sub" + ("s" if sub_count > 1 else "")
-        if en_audio >= 1:
-            return "Dub"
+    # From filename
+    if re.search(r'\bSub\b', filename, re.IGNORECASE):
+        audio_tags.append("Sub")
+    if re.search(r'\bDub\b', filename, re.IGNORECASE):
+        audio_tags.append("Dub")
+    if re.search(r'\bDual\b', filename, re.IGNORECASE):
+        audio_tags.append("Dual")
     
-    if audio_count == 2:
-        return "Dual"
-    elif audio_count == 3:
-        return "Tri"
-    elif audio_count >= 4:
-        return "Multi"
+    # From audio streams if available
+    if audio_info:
+        audio_count, _, jp_audio, en_audio, en_subs = audio_info
+        if jp_audio and en_subs:
+            audio_tags.append("Sub")
+        elif en_audio:
+            audio_tags.append("Dub")
+        if audio_count >= 2:
+            audio_tags.append("Dual" if audio_count == 2 else "Multi")
     
-    return "Unknown"
-
+    return " ".join(sorted(set(audio_tags))) if audio_tags else "Unknown"
 async def detect_video_resolution(file_path):
     """Detect actual video resolution using FFmpeg"""
     ffprobe = shutil.which('ffprobe')
