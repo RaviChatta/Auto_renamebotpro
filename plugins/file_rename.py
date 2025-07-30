@@ -1,3 +1,6 @@
+ERROR:plugins.file_rename:Task error (attempt 1): cannot access local variable 'source_text' where it is not associated with a value
+ERROR:plugins.file_rename:Task error (attempt 2): cannot reuse already awaited coroutine
+ERROR:plugins.file_rename:Task error (attempt 3): cannot reuse already awaited coroutine
 import os
 import re
 import time
@@ -397,9 +400,9 @@ async def ffmpeg_upscale_photo(client, message):
 
         cmd = [
             ffmpeg,
-            "-y",
-            "-i", input_path,
-            "-vf", vf,
+            '-y',
+            '-i', input_path,
+            '-vf', vf,
             output_path
         ]
         process = await asyncio.create_subprocess_exec(
@@ -458,7 +461,7 @@ async def add_admin(client, message):
 
 class TaskQueue:
     def __init__(self):
-        self.queues: Dict[int, Deque[Tuple[str, Message, asyncio.coroutine]]] = {}
+        self.queues: Dict[int, Deque[Tuple[str, Message, asyncio.coroutine]] = {}
         self.processing: Dict[int, Set[str]] = {}
         self.tasks: Dict[str, asyncio.Task] = {}
         self.max_retries = 3
@@ -629,7 +632,7 @@ async def end_sequence(client, message: Message):
     delete_messages = message_ids.pop(user_id, [])
 
     if not file_list:
-        return await message.reply_text("**Nᴏ ғɪʟᴇs ʀᴇᴄᴇɪᴠᴇᴅ ɪɴ ᴛʜɪs sᴇǫᴜᴇɴᴄᴇ!**")
+        return await message.reply_text("**Nᴏ ғɪʟᴇs ʀᴇᴄᴇɪᴠᴇᴅ ɪɴ �ʜɪs sᴇǫᴜᴇɴᴄᴇ!**")
 
     quality_order = {
         "144p": 1, "240p": 2, "360p": 3, "480p": 4,
@@ -1275,26 +1278,30 @@ def extract_title(source_text):
             formatted_words.append(word)
     
     return ' '.join(formatted_words)
+
 def get_replacements(source_text, file_path=None):
     """Generate all possible replacements with fallbacks"""
+    if not source_text:
+        source_text = ""
+    
     season, episode = extract_season_episode(source_text)
     chapter = extract_chapter(source_text)
     volume = extract_volume(source_text)
     quality = extract_quality(source_text)
     language = extract_language(source_text)
     title = extract_title(source_text)
-    codec = extract_codec(source_text, file_path)
+    codec = await extract_codec(source_text, file_path)
     year = extract_year(source_text)
     
     # Get actual resolution if available
     actual_resolution = None
     if file_path and any(x in source_text.lower() for x in ['video', 'mp4', 'mkv', 'mov']):
-        actual_resolution = detect_video_resolution(file_path)
+        actual_resolution = await detect_video_resolution(file_path)
     
     # Get audio info if available
     audio_info = None
     if file_path:
-        audio_info = detect_audio_info(file_path)
+        audio_info = await detect_audio_info(file_path)
     audio_label = get_audio_label(audio_info, source_text) if audio_info else None
 
     return {
@@ -1334,6 +1341,7 @@ def get_replacements(source_text, file_path=None):
         '{Year}': (year or '').title(),
         '{Resolution}': (actual_resolution or quality or '').title(),
     }
+
 def format_filename(template, replacements):
     """Safely format filename with all possible placeholders"""
     try:
@@ -1354,6 +1362,7 @@ def format_filename(template, replacements):
     except Exception as e:
         logger.error(f"Filename formatting failed: {e}")
         return "Renamed_File"  # Fallback name
+
 async def process_thumbnail(thumb_path):
     if not thumb_path or not await aiofiles.os.path.exists(thumb_path):
         return None
@@ -1467,6 +1476,7 @@ async def add_metadata(input_path, output_path, user_id):
         logger.error(f"Metadata processing failed: {e}")
         await cleanup_files(output_path)
         raise
+
 async def convert_to_mkv(input_path, output_path):
     """Convert video file to MKV format"""
     ffmpeg = shutil.which('ffmpeg')
@@ -1576,7 +1586,6 @@ async def auto_rename_files(client, message: Message):
                     {"_id": user_id},
                     {"$inc": {"token": -1}}
                 )
-            replacements = get_replacements(source_text, file_path)
 
             format_template = await DARKXSIDE78.get_format_template(user_id)
             media_preference = await DARKXSIDE78.get_media_preference(user_id)
@@ -1909,6 +1918,7 @@ async def auto_rename_files(client, message: Message):
     )
     
     await task_queue.add_task(user_id, file_id, message, process_file())
+
 def determine_extension(media_type, media_preference, original_ext):
     """Determine the appropriate file extension"""
     if media_type == "video":
@@ -1918,6 +1928,7 @@ def determine_extension(media_type, media_preference, original_ext):
     elif media_type == "audio":
         return ".mp3"
     return ".mp4"  # Default fallback
+
 @Client.on_message(filters.command("renamed") & (filters.group | filters.private))
 @check_ban_status
 async def renamed_stats(client, message: Message):
