@@ -507,6 +507,18 @@ async def detect_video_resolution(file_path):
     except Exception as e:
         logger.error(f"Resolution detection error: {e}")
         return "Unknown"
+def build_standardized_filename(title, season=None, episode=None, quality=None, ext=".mkv"):
+    title = clean_title(title)  # No underscore or apostrophe removal
+    parts = [title]
+
+    if season:
+        parts.append(f"S{season.zfill(2)}")
+    if episode:
+        parts.append(f"E{episode.zfill(2)}")
+    if quality:
+        parts.append(quality)
+
+    return " - ".join(parts) + ext
 
 async def process_thumbnail(thumb_path):
     """Process and resize thumbnail"""
