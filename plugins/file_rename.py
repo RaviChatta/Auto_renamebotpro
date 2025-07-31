@@ -282,6 +282,36 @@ def standardize_filename(filename, format_template=None):
 
     return new_filename
 
+def format_filename(template: str, title: str, season: str, episode: str, quality: str, audio: str, ext: str) -> str:
+    # Fill replacements dictionary
+    replacements = {
+        'title': title,
+        'season': season.zfill(2) if season else '',
+        'episode': episode.zfill(2) if episode else '',
+        'Sseason': f"S{season.zfill(2)}" if season else '',
+        'Eepisode': f"E{episode.zfill(2)}" if episode else '',
+        'quality': quality,
+        'audio': audio,
+        'ext': ext
+    }
+
+    # Replace placeholders with values
+    for key, value in replacements.items():
+        template = template.replace(f"{{{key}}}", value or "")
+
+    # Remove empty brackets
+    template = re.sub(r"\[\s*\]", "", template)
+
+    # Strip extra spaces or dashes
+    template = re.sub(r"\s{2,}", " ", template)
+    template = re.sub(r"[-\s]+$", "", template).strip()
+
+    # Ensure file extension is at the end
+    if not template.endswith(f".{ext}"):
+        template += f".{ext}"
+
+    return template
+
 def extract_chapter(filename):
     if not filename:
         return None
