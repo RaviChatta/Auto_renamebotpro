@@ -429,11 +429,12 @@ def extract_season_episode_title(filename):
                 title = re.sub(pattern, '', title)
             title = clean_title(title)
         
-        return season, episode, title
+        # Ensure we return 3 values (season, episode, title)
+        return season or None, episode or None, title or "Unknown"
     
     except Exception as e:
         logger.error(f"Error in extract_season_episode_title: {e}")
-        return None, None, clean_title(filename)
+        return None, None, clean_title(filename) or "Unknown"
 def build_standardized_filename(title, season=None, episode=None, quality=None, audio=None, ext=".mkv"):
     """Build standardized filename with consistent formatting"""
     # Clean and format components
@@ -477,6 +478,13 @@ async def standardize_filename(filename, user_id, caption=None):
         
         # Extract metadata (this now cleans extensions during extraction)
         metadata = extract_metadata(source_text)
+        
+        # Ensure all required metadata fields exist
+        metadata.setdefault('season', None)
+        metadata.setdefault('episode', None)
+        metadata.setdefault('title', clean_title(source_text) or "Unknown")
+        metadata.setdefault('quality', None)
+        metadata.setdefault('audio', None)
         
         # Apply template (will use .mkv as default extension)
         new_filename = apply_template(format_template, metadata)
