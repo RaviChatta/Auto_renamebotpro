@@ -112,29 +112,18 @@ async def auto_rename_command(client, message):
             await message.reply_text(
                 "<b>⚠️ Please provide a rename template.</b>\n\n"
         
-                "<b>🧾 Format (Series):</b>\n"
-                "<code>/arise [{season} - {episode}] {title} [{quality}] [{audio}]</code>\n"
-                
-                "<b>🧾 Format (Movies):</b>\n"
-                "<code>/arise {title} ({year}) [{audio}] [{quality}] [{codec}]</code>\n\n"
-        
-                "<b>📺 Series Input:</b>\n"
-                "<code>World Trigger S01E03 [1080p] [Dual].mkv</code>\n"
-                "<b>📁 Output:</b>\n"
-                "<code>[S01E03] World Trigger [1080p] [Dual].mkv</code>\n\n"
-        
-                "<b>🎬 Movie Input:</b>\n"
-                "<code>Firefly (2025) HQ HDRip - x264 - [Tam + Tel + Hin + Mal] - (AAC 2.0) - 850MB - ESub.mkv</code>\n"
-                "<b>📁 Output:</b>\n"
-                "<code>Firefly (2025) [HDRip] [Tam + Tel + Hin + Mal] [x264].mkv</code>\n\n"
+                "<b>🧾 Format:</b>\n"
+                "<code>/arise [{title} - {season}x{episode}] [{quality}] [{audio}]</code>\n\n"
         
                 "<b>📌 Notes:</b>\n"
                 "<b>•</b> The bot will use this template to rename your files automatically.\n"
                 "<b>•</b> Enable with <code>/arise_on</code>  •  Disable with <code>/arise_off</code>\n"
                 "<b>•</b> <code>{title}</code> extracts the main title, removing season/episode/quality/metadata.\n"
-                "<b>•</b> Use <code>{year}</code>, <code>{codec}</code> etc. to customize further.",
-               
+                "<b>•</b> Use <code>{season}</code>, <code>{episode}</code>, <code>{quality}</code>, <code>{audio}</code> etc. to customize the filename.\n\n"
+        
+                "<b>⚠️ Disclaimer:</b> Title and season extraction may vary. Test with some files before use.",
             )
+
             return
 
         # Save template for user or process further
