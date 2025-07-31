@@ -448,7 +448,7 @@ def build_standardized_filename(title, season=None, episode=None, quality=None, 
     
     return filename
 
-def standardize_filename(filename, user_id=None, caption=None):
+async def standardize_filename(filename, user_id=None, caption=None):
     """Standardize filename to desired format"""
     try:
         # Get the base name and extension
