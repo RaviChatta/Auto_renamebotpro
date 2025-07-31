@@ -234,39 +234,47 @@ def extract_season_episode_title(filename):
     title = clean_title(title)
     
     return season, episode, title
-
-def standardize_filename(filename):
-    """Convert a messy filename to a standardized format"""
-    # Get file extension (without dot)
+def standardize_filename(filename, format_template=None):
+    """Convert filename using customizable format (automatically removes empty sections)"""
+    if format_template is None:
+        format_template = DEFAULT_FORMAT
+    
     base, ext = os.path.splitext(filename)
-    ext = ext.lower().replace('.', '')  # Remove dot from extension
+    ext = ext.lower()
     
     # Extract components
-    season, episode, title = extract_season_episode_title(base)
+    season, episode = extract_season_episode(base)
     quality = extract_quality(base)
-    languages = extract_languages(base)
+    audio = extract_languages(base)
+    title = clean_title(base)
     
-    # Build the new filename
-    parts = []
-    if title:
-        parts.append(title)
+    # Prepare format variables (handle None cases)
+    format_vars = {
+        'title': title or 'Unknown',
+        'season': season.zfill(2) if season else '',
+        'episode': episode.zfill(2) if episode else '',
+        'quality': quality or '',
+        'audio': audio or '',
+        'ext': ext.replace('.', '')
+    }
     
-    if season and episode:
-        parts.append(f"S{season}E{episode}")
-    elif episode:
-        parts.append(f"E{episode}")
+    # Step 1: Apply the template
+    try:
+        new_filename = format_template.format(**format_vars)
+    except KeyError as e:
+        print(f"Invalid format variable: {e}")
+        return filename  # Fallback to original if format is invalid
     
-    if quality:
-        parts.append(quality)
+    # Step 2: Clean empty sections (both [] and ())
+    new_filename = re.sub(r'\[[\s\-]*\]', '', new_filename)  # Empty []
+    new_filename = re.sub(r'\([\s\-]*\)', '', new_filename)  # Empty ()
+    new_filename = re.sub(r'\s{2,}', ' ', new_filename).strip()  # Extra spaces
     
-    if languages and "SUB" in languages.upper():
-        parts.append(languages)
-    
-    # Only add extension at the end, not in the title
-    new_filename = " - ".join(parts) + f".{ext}"
+    # Step 3: Add extension if not already in template
+    if '{ext}' not in format_template:
+        new_filename += ext
     
     return new_filename
-
 def extract_chapter(filename):
     if not filename:
         return None
@@ -1955,7 +1963,7 @@ async def check_premium_mode():
 # Initialize
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
-
+DEFAULT_FORMAT = "[{title} - {season}-{episode}] [{quality}] [{audio}]"
 renaming_operations = {}
 active_sequences = {}
 message_ids = {}
