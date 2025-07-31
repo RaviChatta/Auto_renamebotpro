@@ -168,6 +168,7 @@ def extract_languages(filename):
             if lang not in languages:
                 languages.append(lang)
     return " ".join(languages) if languages else None
+
 def extract_metadata(filename):
     """Extract metadata after first cleaning the filename"""
     # First clean the filename (removes all extensions from middle)
@@ -181,14 +182,19 @@ def extract_metadata(filename):
         'title': None,
         'chapter': None,
         'volume': None,
-        'resolution': None
+        'resolution': None,
+        'group': None  # Added group tag extraction
     }
+
+    # Extract group tag (like [AE]) if present
+    group_match = re.search(r'\[([A-Z]{2,})\]', filename)
+    if group_match:
+        metadata['group'] = group_match.group(1)
 
     # Extract season and episode
     season_episode_patterns = [
         # Standard formats like S02E01, S02-E01, S2_E1, S02 EP01
         (r'\bS(?:eason)?[_\-\s]*0*(\d{1,2})[_\-\s]*(?:E|EP|Episode)[_\-\s]*0*(\d{1,3})\b', ('season', 'episode')),
-    
         # Season and episode inside brackets: [S02 E01]
         (r'\[S(?:eason)?[_\-\s]*0*(\d{1,2})[_\-\s]*(?:E|EP|Episode)?[_\-\s]*0*(\d{1,3})\]', ('season', 'episode')),
         # Season and episode inside brackets: [2x01]
@@ -256,32 +262,57 @@ def extract_metadata(filename):
     for pattern, _ in season_episode_patterns + quality_patterns + language_patterns:
         title = re.sub(pattern, '', title, flags=re.IGNORECASE)
     
+    # Remove any remaining group tags
+    title = re.sub(r'\[[A-Z]{2,}\]', '', title)
+    
     metadata['title'] = clean_title(title)
     
+    return metadata
     return metadata
 def clean_title(title):
     """Clean and format the title with special handling for patterns"""
     if not title:
         return ""
     
-    # Remove ALL file extensions from anywhere in the title
+    # First remove ALL file extensions from anywhere in the title
     title = re.sub(r'\.\w+(\s|$|\[)', ' ', title)  # Remove extensions followed by space, end, or bracket
+    
+    # Remove uploader tags (@username)
+    title = re.sub(r'@[\w\-]+', '', title)
+    
+    # Remove group tags in brackets (like [AE], [DKB])
+    title = re.sub(r'\[[A-Z]{2,}\]', '', title)
     
     # Preserve special patterns like "No. 8"
     title = re.sub(r'\bNo\.\s*(\d+)\b', r'No \1', title, flags=re.IGNORECASE)
     
     # Remove common unwanted patterns
     cleaning_patterns = [
-        r'@[\w\-]+',  # Uploader tags
-        r'\[.*?\]',   # Anything in brackets
+        r'\[.*?\]',   # Anything in brackets (but preserve if it contains season/episode)
         r'\(.*?\)',   # Anything in parentheses
         r'[^\w\s\-]', # Special chars except spaces and hyphens
         r'[\-_]+',    # Multiple underscores/hyphens
         r'\s+',       # Multiple spaces
     ]
     
+    # Temporarily protect season/episode patterns before cleaning
+    protected = {}
+    def protect_match(match):
+        key = f"PROTECTED_{len(protected)}"
+        protected[key] = match.group(0)
+        return key
+    
+    # Protect season/episode patterns
+    for pattern, _ in SEASON_EPISODE_PATTERNS:
+        title = re.sub(pattern, protect_match, title)
+    
+    # Now clean the title
     for pattern in cleaning_patterns:
         title = re.sub(pattern, ' ', title)
+    
+    # Restore protected patterns
+    for key, value in protected.items():
+        title = title.replace(key, value)
     
     # Final cleanup
     title = title.strip()
