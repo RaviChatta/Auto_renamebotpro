@@ -169,7 +169,10 @@ def extract_languages(filename):
                 languages.append(lang)
     return " ".join(languages) if languages else None
 def extract_metadata(filename):
-    """Extract all metadata from filename in one pass for efficiency"""
+    """Extract metadata after first cleaning the filename"""
+    # First clean the filename
+    cleaned_name = clean_filename(filename)
+    
     metadata = {
         'season': None,
         'episode': None,
@@ -180,6 +183,7 @@ def extract_metadata(filename):
         'volume': None,
         'resolution': None
     }
+    
 
     # Extract season and episode first
     season_episode_patterns = [
@@ -255,15 +259,14 @@ def extract_metadata(filename):
     metadata['title'] = clean_title(title)
     
     return metadata
-def clean_title(title):
-    """Clean and format the title with special handling for patterns"""
-    if not title:
-        return ""
+def clean_filename(filename):
+    """Clean filename by removing duplicate extensions and unwanted patterns"""
+    # Remove file extension if it appears in the middle
+    base, ext = os.path.splitext(filename)
+    base = re.sub(r'\.\w+$', '', base)  # Remove any extension-like patterns at end
+    base = re.sub(r'\.\w+(?=\s*[\[\(-])', '', base)  # Remove extensions before brackets/hyphens
     
-    # Preserve special patterns like "No. 8"
-    title = re.sub(r'\bNo\.\s*(\d+)\b', r'No \1', title, flags=re.IGNORECASE)
-    
-    # Remove common unwanted patterns
+    # Clean other unwanted patterns
     cleaning_patterns = [
         r'@[\w\-]+',  # Uploader tags
         r'\[.*?\]',   # Anything in brackets
@@ -274,14 +277,16 @@ def clean_title(title):
     ]
     
     for pattern in cleaning_patterns:
-        title = re.sub(pattern, ' ', title)
+        base = re.sub(pattern, ' ', base)
     
     # Final cleanup
-    title = title.strip()
-    title = re.sub(r'\s+', ' ', title)
-    title = re.sub(r'[-\s]+$', '', title)
+    base = base.strip()
+    base = re.sub(r'\s+', ' ', base)
+    base = re.sub(r'[-\s]+$', '', base)
     
-    return title
+    # Re-add the actual extension
+    return f"{base}{ext}"
+
 def apply_template(template, metadata, ext):
     """Apply the template with all available variables"""
     # Prepare all possible variables
@@ -345,39 +350,37 @@ def extract_season_episode_title(filename):
     
     return season, episode, title
 
-DEFAULT_FORMAT = "[{title} - {Sseason}x{Eepisode}] [{quality}] [{audio}]"
 
-async def standardize_filename(filename, user_id, caption=None):
-    """Main function to standardize filenames with user preferences"""
-    # Get user preferences
-    format_template = await DARKXSIDE78.get_format_template(user_id) or "[{title} - {Sseason}x{Eepisode}] [{quality}] [{audio}]"
-    metadata_source = await DARKXSIDE78.get_metadata_source(user_id) or "filename"
+def build_standardized_filename(title, season=None, episode=None, quality=None, audio=None, ext=".mkv"):
+    """Build filename ensuring no duplicate extensions"""
+    # Clean and format components
+    title = clean_filename(title) or "Unknown"
     
-    # Get the source text (filename or caption)
-    source_text = caption if metadata_source == "caption" and caption else filename
+    # Remove any existing extension from title
+    title = re.sub(r'\.\w+$', '', title)
     
-    # Extract metadata
-    metadata = extract_metadata(source_text)
+    # Build parts
+    parts = []
+    if title:
+        parts.append(title)
+    if season and episode:
+        parts.append(f"S{season}E{episode}")
+    elif episode:
+        parts.append(f"E{episode}")
+    if quality:
+        parts.append(quality)
+    if audio:
+        parts.append(audio)
     
-    # Get file extension
-    base, ext = os.path.splitext(filename)
-    ext = ext.lower()
+    # Join with hyphens and clean up
+    filename = " - ".join(parts).strip()
+    filename = re.sub(r'[-\s]+$', '', filename)
     
-    # Apply template
-    new_filename = apply_template(format_template, metadata, ext)
+    # Add extension if not already present
+    if not filename.lower().endswith(ext.lower()):
+        filename += ext
     
-    # Fallback if template application failed
-    if not new_filename:
-        new_filename = build_standardized_filename(
-            title=metadata['title'],
-            season=metadata['season'],
-            episode=metadata['episode'],
-            quality=metadata['quality'],
-            audio=metadata['audio'],
-            ext=ext
-        )
-    
-    return new_filename
+    return filename
 
 def build_standardized_filename(title, season=None, episode=None, quality=None, audio=None, ext=".mkv"):
     """Build standardized filename with consistent formatting"""
