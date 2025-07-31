@@ -101,7 +101,6 @@ CLEANING_PATTERNS = [
     re.compile(r'\s+'),        # Multiple spaces
 ]
 
-
 # Utility Functions
 def check_ban_status(func):
     from functools import wraps
@@ -130,6 +129,7 @@ def parse_duration(arg):
     elif arg.isdigit():
         return int(arg)
     return None
+
 
 def extract_season_episode(filename):
     """Extract season and episode information from filename"""
@@ -168,6 +168,7 @@ def extract_languages(filename):
             if lang not in languages:
                 languages.append(lang)
     return " ".join(languages) if languages else None
+
 def clean_title(title):
     """Clean and format the title"""
     if not title:
@@ -207,19 +208,15 @@ def clean_title(title):
             formatted_words.append(word)
     
     return ' '.join(formatted_words)
-def standardize_filename(filename):
-    """Convert a messy filename to a standardized format"""
-    # Get file extension
-    base, ext = os.path.splitext(filename)
-    ext = ext.lower()
-    
-    # Extract components
-    season, episode = extract_season_episode(base)
-    quality = extract_quality(base)
-    languages = extract_languages(base)
+
+def extract_season_episode_title(filename):
+    """Extract season, episode, and clean title from filename"""
+    season, episode = extract_season_episode(filename)
+    quality = extract_quality(filename)
+    languages = extract_languages(filename)
     
     # Clean title by removing all the extracted components
-    title = base
+    title = filename
     
     # Remove season/episode patterns
     for pattern, _ in SEASON_EPISODE_PATTERNS:
@@ -235,6 +232,19 @@ def standardize_filename(filename):
     
     # Clean the title
     title = clean_title(title)
+    
+    return season, episode, title
+
+def standardize_filename(filename):
+    """Convert a messy filename to a standardized format"""
+    # Get file extension
+    base, ext = os.path.splitext(filename)
+    ext = ext.lower()
+    
+    # Extract components
+    season, episode, title = extract_season_episode_title(base)
+    quality = extract_quality(base)
+    languages = extract_languages(base)
     
     # Build the new filename
     parts = []
