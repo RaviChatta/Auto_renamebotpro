@@ -379,30 +379,16 @@ def apply_template(template, metadata, ext=".mkv"):
 
 def extract_season_episode_title(filename):
     """Extract season, episode, and clean title from filename"""
-    season, episode = extract_season_episode(filename)
-    quality = extract_quality(filename)
-    languages = extract_languages(filename)
-    
-    # Clean title by removing all the extracted components
-    title = filename
-    
-    # Remove season/episode patterns
-    for pattern, _ in SEASON_EPISODE_PATTERNS:
-        title = pattern.sub('', title)
-    
-    # Remove quality patterns
-    for pattern, _ in QUALITY_PATTERNS:
-        title = pattern.sub('', title)
-    
-    # Remove language patterns
-    for pattern, _ in LANGUAGE_PATTERNS:
-        title = pattern.sub('', title)
-    
-    # Clean the title
-    title = clean_title(title)
-    
-    return season, episode, title
-
+    try:
+        metadata = extract_metadata(filename)
+        season = metadata.get('season')
+        episode = metadata.get('episode')
+        title = metadata.get('title', 'Unknown')
+        
+        return season, episode, title
+    except Exception as e:
+        logger.error(f"Error in extract_season_episode_title: {e}")
+        return None, None, clean_title(filename)
 
 def build_standardized_filename(title, season=None, episode=None, quality=None, audio=None, ext=".mkv"):
     """Build standardized filename with consistent formatting"""
