@@ -55,39 +55,52 @@ import re
 from functools import wraps
 
 
-# Constants and Patterns
+# Constants for patterns
 SEASON_EPISODE_PATTERNS = [
-    (re.compile(r'\bS(\d{1,2})[\s\-_]*(?:E|EP|Episode)[\s\-_]*(\d{1,3})\b', re.IGNORECASE), ('season', 'episode')),
-    (re.compile(r'\bS(\d{1,2})[\s\-_]+(\d{1,3})\b', re.IGNORECASE), ('season', 'episode')),
-    (re.compile(r'\b(\d{1,2})x(\d{1,3})\b', re.IGNORECASE), ('season', 'episode')),
-    (re.compile(r'\[S(\d{1,2})[\s\-]+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),
-    (re.compile(r'\[S(\d{1,2})[\s\-]+(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),
-    (re.compile(r'\[S\s*(\d{1,2})\s*E\s*(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),
-    (re.compile(r'\[S(\d+)\]\[E(\d+)\]', re.IGNORECASE), ('season', 'episode')),
-    (re.compile(r'\b(?:Episode|EP|E)\s*(\d{1,3})\b', re.IGNORECASE), (None, 'episode')),
-    (re.compile(r'\b(\d{1,3})\b', re.IGNORECASE), (None, 'episode'))
+    # Standard patterns (S01E02, S01-E02, S01_E02, etc.)
+    (re.compile(r'S(\d{1,2})[_\-\s]*(?:E|EP|Episode)[_\-\s]*(\d{1,3})', re.IGNORECASE), ('season', 'episode')),
+    (re.compile(r'S(\d{1,2})[_\-\s]+(\d{1,3})', re.IGNORECASE), ('season', 'episode')),
+    (re.compile(r'(\d{1,2})x(\d{1,3})', re.IGNORECASE), ('season', 'episode')),
+    
+    # Patterns with brackets or other delimiters
+    (re.compile(r'\[S(\d{1,2})[_\-\s]*E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),
+    (re.compile(r'\[(\d{1,2})x(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),
+    
+    # Episode-only patterns
+    (re.compile(r'\b(?:EP|Episode)[_\-\s]*(\d{1,3})\b', re.IGNORECASE), (None, 'episode')),
+    (re.compile(r'\bE(\d{1,3})\b', re.IGNORECASE), (None, 'episode')),
 ]
 
 QUALITY_PATTERNS = [
-    (re.compile(r'\b(4k|2160p)\b', re.IGNORECASE), lambda m: "2160p"),
-    (re.compile(r'\b(2k|1440p)\b', re.IGNORECASE), lambda m: "1440p"),
-    (re.compile(r'\b(\d{3,4})p\b', re.IGNORECASE), lambda m: f"{m.group(1)}p"),
-    (re.compile(r'\[(\d{3,4}p)\]', re.IGNORECASE), lambda m: m.group(1)),
-    (re.compile(r'\b(HDRip|HDTV|WEB[-_]?DL|WEB[-_]?RIP|Blu[-_]?Ray)\b', re.IGNORECASE), lambda m: m.group(1).replace('_', '-').upper()),
-    (re.compile(r'\b(4kX264|4kX265)\b', re.IGNORECASE), lambda m: m.group(1).upper()),
+    (re.compile(r'\b(4k|2160p|uhd)\b', re.IGNORECASE), "2160p"),
+    (re.compile(r'\b(1080p|fullhd|fhd)\b', re.IGNORECASE), "1080p"),
+    (re.compile(r'\b(720p|hd)\b', re.IGNORECASE), "720p"),
+    (re.compile(r'\b(480p|sd)\b', re.IGNORECASE), "480p"),
+    (re.compile(r'\b(web[\-_]?dl|web[\-_]?rip)\b', re.IGNORECASE), "WEB-DL"),
+    (re.compile(r'\b(blu[\-_]?ray|bdrip|brrip)\b', re.IGNORECASE), "BluRay"),
+    (re.compile(r'\b(hdtv|dsr|pdtv)\b', re.IGNORECASE), "HDTV"),
+    (re.compile(r'\b(dvdrip|dvdr)\b', re.IGNORECASE), "DVDrip"),
+    (re.compile(r'\b(x264|x265|h264|h265|hevc|avc)\b', re.IGNORECASE), lambda m: m.group(0).upper()),
 ]
 
-TITLE_CLEANING_PATTERNS = [
-    re.compile(r'@[\w_]+'),  # Uploader tags
-    re.compile(r'\[.*?\]'),   # Anything in brackets
-    re.compile(r'\(.*?\)'),   # Anything in parentheses
-    re.compile(r'\b(?:480p|720p|1080p|1440p|2160p|4K|HDR|WEB|DL|Rip|Sub|Dub|Dual|Multi|x264|x265|hevc|aac|ac3|dts|esub|subbed|10bit)\b', re.IGNORECASE),
-    re.compile(r'\b(Telugu|Tamil|Hindi|English|Japanese|Tel|Tam|Hin|Eng|Jpn|Sub|Dub|Dual|Multi)(?:[_+](Telugu|Tamil|Hindi|English|Japanese|Tel|Tam|Hin|Eng|Jpn|Sub|Dub|Dual|Multi))*\b', re.IGNORECASE),  # Language tags
-    re.compile(r'[^\w\s\-:]'), # Special chars except spaces, hyphens, and colons
-    re.compile(r'\s+'),       # Multiple spaces
-    re.compile(r'[_\-\s:]+$'), # Trailing separators
-    re.compile(r'^\s+'),      # Leading spaces
+LANGUAGE_PATTERNS = [
+    (re.compile(r'\b(eng|english)\b', re.IGNORECASE), "ENG"),
+    (re.compile(r'\b(jpn|japanese)\b', re.IGNORECASE), "JPN"),
+    (re.compile(r'\b(tel|telugu)\b', re.IGNORECASE), "TEL"),
+    (re.compile(r'\b(tam|tamil)\b', re.IGNORECASE), "TAM"),
+    (re.compile(r'\b(hin|hindi)\b', re.IGNORECASE), "HIN"),
+    (re.compile(r'\b(sub|dub|dual|multi)\b', re.IGNORECASE), lambda m: m.group(0).upper()),
 ]
+
+CLEANING_PATTERNS = [
+    re.compile(r'@[\w\-]+'),  # Uploader tags (@username)
+    re.compile(r'\[.*?\]'),    # Anything in brackets
+    re.compile(r'\(.*?\)'),    # Anything in parentheses
+    re.compile(r'[^\w\s\-\.]'), # Special chars except spaces, hyphens, and dots
+    re.compile(r'[\-_]+'),     # Multiple underscores/hyphens
+    re.compile(r'\s+'),        # Multiple spaces
+]
+
 
 # Utility Functions
 def check_ban_status(func):
@@ -118,161 +131,130 @@ def parse_duration(arg):
         return int(arg)
     return None
 
-def clean_filename(filename):
-    if not filename:
-        return "Unknown.mkv"
-    
-    # Extract file extension
-    file_ext = re.search(r'\.\w+$', filename, re.IGNORECASE)
-    ext = file_ext.group(0).lower() if file_ext else '.mkv'
-    filename_no_ext = re.sub(r'\.\w+$', '', filename)
-    
-    # Extract season, episode, and title
-    season, episode, title = extract_season_episode_title(filename_no_ext)
-    
-    # Extract quality
-    quality = extract_quality(filename_no_ext)
-    
-    # Clean title
-    title = clean_title(title)
-    
-    # Build standardized filename
-    return build_standardized_filename(title, season, episode, quality, ext)
-
-def extract_season_episode_title(filename):
-    if not filename:
-        return None, None, "Unknown"
-
-    # Clean filename initially to remove uploader and language tags
-    filename_cleaned = clean_title(filename, early=True)
-    
+def extract_season_episode(filename):
+    """Extract season and episode information from filename"""
     for pattern, (season_group, episode_group) in SEASON_EPISODE_PATTERNS:
-        match = pattern.search(filename_cleaned)
+        match = pattern.search(filename)
         if match:
             season = match.group(1).zfill(2) if season_group else None
             episode = match.group(2 if season_group else 1).zfill(2)
-            # Remove the matched season/episode part to isolate the title
-            title_part = re.sub(pattern, ' ', filename_cleaned)
-            title_part = clean_title(title_part, early=True).strip()
-            return season, episode, title_part or "Unknown"
-    
-    return None, None, filename_cleaned
+            return season, episode
+    return None, None
 
 def extract_quality(filename):
-    if not filename:
-        return "Unknown"
-
-    quality_map = {
-        '480p': '480p',
-        '720p': '720p',
-        '1080p': '1080p',
-        '1440p': '1440p',
-        '2160p': '2160p',
-        '4k': '2160p',
-        'hdr': 'HDR',
-        'hdrip': 'HDRip',
-        'hdtv': 'HDTV',
-        'webdl': 'WEB-DL',
-        'webrip': 'WEBRip',
-        'blu-ray': 'BluRay',
-        'web-dl': 'WEB-DL',
-        'web-rip': 'WEBRip',
-        'web_dl': 'WEB-DL',
-        'web_rip': 'WEBRip'
-    }
-
-    seen = set()
-    quality_parts = []
-
-    for pattern, extractor in QUALITY_PATTERNS:
+    """Extract quality information from filename"""
+    qualities = []
+    for pattern, replacement in QUALITY_PATTERNS:
         match = pattern.search(filename)
         if match:
-            raw_quality = extractor(match).lower()
-            normalized = quality_map.get(raw_quality, raw_quality.upper())
-            if normalized not in seen:
-                quality_parts.append(normalized)
-                seen.add(normalized)
-                filename = filename.replace(match.group(0), '', 1)
-    
-    return " ".join(sorted(quality_parts)) if quality_parts else "Unknown"
+            if callable(replacement):
+                quality = replacement(match)
+            else:
+                quality = replacement
+            if quality not in qualities:
+                qualities.append(quality)
+    return " ".join(qualities) if qualities else None
 
 def extract_languages(filename):
-    if not filename:
-        return []
-
-    language_map = {
-        'telugu': 'Telugu',
-        'tamil': 'Tamil',
-        'hindi': 'Hindi',
-        'eng': 'English',
-        'english': 'English',
-        'jpn': 'Japanese',
-        'japanese': 'Japanese',
-        'sub': 'Sub',
-        'dub': 'Dub',
-        'dual': 'Dual',
-        'multi': 'Multi'
-    }
-    
-    bracketed_lang = re.search(r'\[([^\]]*?)\]', filename, re.IGNORECASE)
-    languages = set()
-    
-    if bracketed_lang:
-        lang_str = bracketed_lang.group(1)
-        lang_list = re.split(r'[\s\-+]+', lang_str.strip())
-        for lang in lang_list:
-            lang = lang.strip().lower()
-            if lang in language_map:
-                languages.add(language_map[lang])
-        filename = filename.replace(bracketed_lang.group(0), '')
-
-    for lang in language_map:
-        if re.search(rf'\b{lang}\b', filename, re.IGNORECASE):
-            languages.add(language_map[lang])
-    
-    return sorted(languages) if languages else []
-
-def clean_title(title, early=False):
+    """Extract language information from filename"""
+    languages = []
+    for pattern, replacement in LANGUAGE_PATTERNS:
+        match = pattern.search(filename)
+        if match:
+            if callable(replacement):
+                lang = replacement(match)
+            else:
+                lang = replacement
+            if lang not in languages:
+                languages.append(lang)
+    return " ".join(languages) if languages else None
+def clean_title(title):
+    """Clean and format the title"""
     if not title:
         return ""
     
-    for pattern in TITLE_CLEANING_PATTERNS:
+    # Apply cleaning patterns
+    for pattern in CLEANING_PATTERNS:
         title = pattern.sub(' ', title)
     
-    title = re.sub(r'\s+', ' ', title).strip()
+    # Remove any remaining special characters except spaces and hyphens
+    title = re.sub(r'[^\w\s\-]', '', title)
     
-    if early:
-        return title
+    # Trim and clean up
+    title = title.strip()
+    title = re.sub(r'\s+', ' ', title)
+    title = re.sub(r'[\-_]+$', '', title)
     
-    return format_title_case(title)
-
-def format_title_case(title):
-    if not title:
-        return ""
-    
-    lowercase_words = {
-        'a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on',
-        'at', 'to', 'from', 'by', 'of', 'in', 'with', 'as', 'is', 'no'
-    }
-    
+    # Title case conversion with exceptions
     words = title.split()
     if not words:
         return ""
+    
+    lowercase_words = {'a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on',
+                      'at', 'to', 'from', 'by', 'of', 'in', 'with', 'as', 'is'}
     
     formatted_words = []
     for i, word in enumerate(words):
         if i > 0 and word.lower() in lowercase_words:
             formatted_words.append(word.lower())
         else:
-            if '-' in word or ':' in word:
-                parts = re.split(r'([-:])', word)
-                parts = [p[0].upper() + p[1:].lower() if len(p) > 1 else p.upper() for p in parts]
-                word = ''.join(parts)
+            # Handle hyphenated words
+            if '-' in word:
+                parts = [p.capitalize() for p in word.split('-')]
+                word = '-'.join(parts)
             else:
-                word = word[0].upper() + word[1:].lower() if len(word) > 1 else word.upper()
+                word = word.capitalize()
             formatted_words.append(word)
     
     return ' '.join(formatted_words)
+def standardize_filename(filename):
+    """Convert a messy filename to a standardized format"""
+    # Get file extension
+    base, ext = os.path.splitext(filename)
+    ext = ext.lower()
+    
+    # Extract components
+    season, episode = extract_season_episode(base)
+    quality = extract_quality(base)
+    languages = extract_languages(base)
+    
+    # Clean title by removing all the extracted components
+    title = base
+    
+    # Remove season/episode patterns
+    for pattern, _ in SEASON_EPISODE_PATTERNS:
+        title = pattern.sub('', title)
+    
+    # Remove quality patterns
+    for pattern, _ in QUALITY_PATTERNS:
+        title = pattern.sub('', title)
+    
+    # Remove language patterns
+    for pattern, _ in LANGUAGE_PATTERNS:
+        title = pattern.sub('', title)
+    
+    # Clean the title
+    title = clean_title(title)
+    
+    # Build the new filename
+    parts = []
+    if title:
+        parts.append(title)
+    
+    if season and episode:
+        parts.append(f"S{season}E{episode}")
+    elif episode:
+        parts.append(f"E{episode}")
+    
+    if quality:
+        parts.append(quality)
+    
+    if languages and "SUB" in languages.upper():
+        parts.append(languages)
+    
+    new_filename = " - ".join(parts) + ext
+    
+    return new_filename
 
 def extract_chapter(filename):
     if not filename:
