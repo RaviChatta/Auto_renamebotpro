@@ -448,15 +448,18 @@ def build_standardized_filename(title, season=None, episode=None, quality=None, 
     
     return filename
 
-async def standardize_filename(filename, user_id=None, caption=None):
+def standardize_filename(filename, user_id=None, caption=None):
     """Standardize filename to desired format"""
     try:
         # Get the base name and extension
         base_name, ext = os.path.splitext(filename)
         ext = ext.lower()
         
+        # Remove any middle extensions (like .mkv in the middle of filename)
+        base_name = re.sub(r'\.(mkv|mp4|avi|mov|webm|flv|wmv)\b', '', base_name, flags=re.IGNORECASE)
+        
         # Use caption if available and metadata source is set to caption
-        source_text = caption if (caption and user_id and await DARKXSIDE78.get_metadata_source(user_id) == "caption") else filename
+        source_text = caption if (caption and user_id and await DARKXSIDE78.get_metadata_source(user_id) == "caption") else base_name
         
         # Extract components
         season, episode = extract_season_episode(source_text)
@@ -464,8 +467,11 @@ async def standardize_filename(filename, user_id=None, caption=None):
         language = extract_language(source_text)
         title = clean_title(source_text)
         
-        # Remove extracted components from title
-        if season or episode:
+        # Remove season/episode patterns from title if they were already at start
+        if season and episode:
+            # Remove patterns like "S4 02" at start
+            title = re.sub(r'^S\d{1,2}[_\-\s]*\d{1,3}[_\-\s]*', '', title, flags=re.IGNORECASE)
+            # Remove other season-episode patterns
             title = re.sub(r'S\d{1,2}[_\-\s]*(?:E|EP|Episode)[_\-\s]*\d{1,3}', '', title, flags=re.IGNORECASE)
             title = re.sub(r'\d{1,2}x\d{1,3}', '', title, flags=re.IGNORECASE)
             title = re.sub(r'\[S\d{1,2}[-_]\d{1,3}\]', '', title, flags=re.IGNORECASE)
@@ -478,31 +484,7 @@ async def standardize_filename(filename, user_id=None, caption=None):
         
         title = clean_title(title)
         
-        # Build new filename based on user's template if available
-        if user_id:
-            template = await DARKXSIDE78.get_format_template(user_id)
-            if template:
-                format_vars = {
-                    'title': title,
-                    'season': season or '',
-                    'episode': episode or '',
-                    'quality': quality or '',
-                    'audio': language or '',
-                    'ext': ext.replace('.', ''),
-                }
-                try:
-                    new_name = template.format(**format_vars)
-                    # Clean empty brackets and extra spaces
-                    new_name = re.sub(r'\[\s*\]', '', new_name)
-                    new_name = re.sub(r'\(\s*\)', '', new_name)
-                    new_name = re.sub(r'\s{2,}', ' ', new_name).strip()
-                    if not new_name.lower().endswith(ext.lower()):
-                        new_name += ext
-                    return new_name
-                except (KeyError, ValueError):
-                    pass  # Fall back to default format if template fails
-        
-        # Default format if no template or template fails
+        # Build new filename
         parts = []
         if title:
             parts.append(title)
@@ -516,10 +498,11 @@ async def standardize_filename(filename, user_id=None, caption=None):
             parts.append(language)
         
         new_name = " - ".join(parts).strip()
-        if not new_name.lower().endswith(ext.lower()):
-            new_name += ext
         
-        return new_name
+        # Ensure we don't have duplicate extensions
+        if new_name.lower().endswith(ext.lower()):
+            return new_name
+        return f"{new_name}{ext}"
     
     except Exception as e:
         logger.error(f"Error standardizing filename: {e}")
