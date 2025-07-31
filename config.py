@@ -25,10 +25,10 @@ class Config(object):
     DUMP = False
     BOT_CHANNEL_NAME = os.environ.get("BOT_CHANNEL_NAME", "TFIBOTS")
     BOT_CHANNEL_USERNAME = os.environ.get("BOT_CHANNEL_USERNAME", "@TFIBOTS")
-    SUPPORT_CHANNEL_NAME = os.environ.get("SUPPORT_CHANNEL_NAME", "@TFIBOTS ")
-    UPDATE_CHANNEL = os.environ.get("SUPPORT_CHANNEL_USERNAME", "@TFIBOTS ")
+    SUPPORT_CHANNEL_NAME = os.environ.get("SUPPORT_CHANNEL_NAME", "@TFIBOTS_SUPPORT ")
+    UPDATE_CHANNEL = os.environ.get("SUPPORT_CHANNEL_USERNAME", "@TFIBOTS_SUPPORT ")
     SUPPORT_CHANNEL_USERNAME = os.environ.get("SUPPORT_CHANNEL_USERNAME", "@TFIBOTS ")
-    SUPPORT_GROUP = os.environ.get("SUPPORT_CHANNEL_USERNAME", "T@FIBOTS_SUPPORT ")
+    SUPPORT_GROUP = os.environ.get("SUPPORT_CHANNEL_USERNAME", "@TFIBOTS_SUPPORT ")
     BOT_USERNAME = os.environ.get("BOT_USERNAME", "@Autorenamer2bot")
     BOT_NAME = os.environ.get("BOT_NAME", "Sung JIN WOO")
     OWNER_NAME = os.environ.get("OWNER_NAME", "Raaaaavi")
@@ -77,30 +77,28 @@ class Txt(object):
     FILE_NAME_TXT = """<b>» <u>Setup Auto-Rename Format</u></b>
 
 <b>Available Variables:</b>
+➲ <code>{title}</code> – Main title  
 ➲ <code>{season}</code> – Season number  
 ➲ <code>{episode}</code> – Episode number  
-➲ <code>{title}</code> – Main title  
-➲ <code>{year}</code> – Year (for movies)  
-➲ <code>{resolution}</code> – Video resolution  
+➲ <code>{quality}</code> – Video quality (e.g., 1080p)  
 ➲ <code>{audio}</code> – Audio language or format  
-➲ <code>{codec}</code> – Video codec  
-➲ <code>{chapter}</code> – Chapter (if any)
 
-<b>Formats:</b>  
-➲ <b>TV Series:</b> <code> /arise [{season} - {episode}] {title} [{quality}] [{audio}] </code>  
-➲ <b>Movies:</b> <code> /arise {title} ({year}) [{audio}] [{quality}] [{codec}] </code>
+<b>Format:</b>  
+➲ <code>/arise [{title} - {season}-{episode}] [{quality}] [{audio}]</code>
 
 <b>Auto-Rename Toggle:</b>  
 ➲ <code>/arise_on</code> – Enable auto-renaming  
 ➲ <code>/arise_off</code> – Disable auto-renaming
 
 <b>Usage:</b>  
-Use the above variables in your rename format with the <code>/autorename</code> command.  
+Use the above variables in your rename format with the <code>/arise</code> command.  
 The bot will extract values from the filename and apply them automatically.
+
 <b>⚠️ Disclaimer:</b>  
 Title and season extraction may vary depending on filename format.  
 Please test with a few files first to ensure proper results.
 """
+
 
 
 
