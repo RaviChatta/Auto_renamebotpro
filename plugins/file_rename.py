@@ -237,9 +237,9 @@ def extract_season_episode_title(filename):
 
 def standardize_filename(filename):
     """Convert a messy filename to a standardized format"""
-    # Get file extension
+    # Get file extension (without dot)
     base, ext = os.path.splitext(filename)
-    ext = ext.lower()
+    ext = ext.lower().replace('.', '')  # Remove dot from extension
     
     # Extract components
     season, episode, title = extract_season_episode_title(base)
@@ -262,7 +262,8 @@ def standardize_filename(filename):
     if languages and "SUB" in languages.upper():
         parts.append(languages)
     
-    new_filename = " - ".join(parts) + ext
+    # Only add extension at the end, not in the title
+    new_filename = " - ".join(parts) + f".{ext}"
     
     return new_filename
 
