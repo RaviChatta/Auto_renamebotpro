@@ -69,6 +69,14 @@ SEASON_EPISODE_PATTERNS = [
     # Episode-only patterns
     (re.compile(r'\b(?:EP|Episode)[_\-\s]*(\d{1,3})\b', re.IGNORECASE), (None, 'episode')),
     (re.compile(r'\bE(\d{1,3})\b', re.IGNORECASE), (None, 'episode')),
+        (re.compile(r'\[S(\d{1,2})[-_](\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),
+    # Standard patterns
+    (re.compile(r'S(\d{1,2})[_\-\s]*(?:E|EP|Episode)[_\-\s]*(\d{1,3})', re.IGNORECASE), ('season', 'episode')),
+    (re.compile(r'S(\d{1,2})[_\-\s]+(\d{1,3})', re.IGNORECASE), ('season', 'episode')),
+    (re.compile(r'(\d{1,2})x(\d{1,3})', re.IGNORECASE), ('season', 'episode')),
+    # Episode-only patterns
+    (re.compile(r'\b(?:EP|Episode)[_\-\s]*(\d{1,3})\b', re.IGNORECASE), (None, 'episode')),
+    (re.compile(r'\bE(\d{1,3})\b', re.IGNORECASE), (None, 'episode')),
 ]
 
 QUALITY_PATTERNS = [
@@ -282,7 +290,23 @@ def clean_title(title):
     
     # Remove group tags in brackets (like [AE], [DKB])
     title = re.sub(r'\[[A-Z]{2,}\]', '', title)
+        # Remove file extension
+    title = re.sub(r'\.[^\.]+$', '', title)
     
+    # Remove uploader tags (@username) and group tags ([AE])
+    title = re.sub(r'@[\w\-]+', '', title)
+    title = re.sub(r'\[[A-Z]{2,}\]', '', title)
+    
+    # Remove quality and audio tags (but preserve for metadata)
+    title = re.sub(r'\[(?:720p|1080p|480p|2160p|4K|HD|SD)\]', '', title, flags=re.IGNORECASE)
+    title = re.sub(r'\[(?:Sub|Dub|Dual|Multi)\]', '', title, flags=re.IGNORECASE)
+    
+    # Remove special characters except spaces and hyphens
+    title = re.sub(r'[^\w\s\-]', ' ', title)
+    
+    # Clean up multiple spaces/hyphens
+    title = re.sub(r'[\-_]+', ' ', title)
+    title = re.sub(r'\s+', ' ', title).strip()
     # Preserve special patterns like "No. 8"
     title = re.sub(r'\bNo\.\s*(\d+)\b', r'No \1', title, flags=re.IGNORECASE)
     
@@ -380,16 +404,36 @@ def apply_template(template, metadata, ext=".mkv"):
 def extract_season_episode_title(filename):
     """Extract season, episode, and clean title from filename"""
     try:
+        # First try to extract from metadata
         metadata = extract_metadata(filename)
         season = metadata.get('season')
         episode = metadata.get('episode')
-        title = metadata.get('title', 'Unknown')
+        
+        # If not found in metadata, try direct extraction
+        if not season and not episode:
+            for pattern, (season_group, episode_group) in SEASON_EPISODE_PATTERNS:
+                match = pattern.search(filename)
+                if match:
+                    if season_group:
+                        season = match.group(1).zfill(2) if match.group(1) else None
+                    episode = match.group(2 if season_group else 1).zfill(2) if episode_group else None
+                    if season or episode:
+                        break
+        
+        # Clean title
+        title = clean_title(filename)
+        
+        # Remove season/episode patterns from title if found
+        if season or episode:
+            for pattern, _ in SEASON_EPISODE_PATTERNS:
+                title = re.sub(pattern, '', title)
+            title = clean_title(title)
         
         return season, episode, title
+    
     except Exception as e:
         logger.error(f"Error in extract_season_episode_title: {e}")
         return None, None, clean_title(filename)
-
 def build_standardized_filename(title, season=None, episode=None, quality=None, audio=None, ext=".mkv"):
     """Build standardized filename with consistent formatting"""
     # Clean and format components
