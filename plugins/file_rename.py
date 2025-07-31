@@ -234,47 +234,54 @@ def extract_season_episode_title(filename):
     title = clean_title(title)
     
     return season, episode, title
+
+DEFAULT_FORMAT = "[{title} - {Sseason}x{Eepisode}] [{quality}] [{audio}]"
+
 def standardize_filename(filename, format_template=None):
-    """Convert filename using customizable format (automatically removes empty sections)"""
+    """Standardize filename using a template with auto-cleaned empty sections"""
+
     if format_template is None:
         format_template = DEFAULT_FORMAT
-    
+
     base, ext = os.path.splitext(filename)
     ext = ext.lower()
-    
-    # Extract components
+
+    # Extract metadata
     season, episode = extract_season_episode(base)
     quality = extract_quality(base)
     audio = extract_languages(base)
-    title = clean_title(base)
-    
-    # Prepare format variables (handle None cases)
+    _, _, title = extract_season_episode_title(base)
+
+    # Format variables (Sxx and Exx support)
     format_vars = {
         'title': title or 'Unknown',
         'season': season.zfill(2) if season else '',
         'episode': episode.zfill(2) if episode else '',
         'quality': quality or '',
         'audio': audio or '',
-        'ext': ext.replace('.', '')
+        'ext': ext.replace('.', ''),
+        'Sseason': f"S{season.zfill(2)}" if season else '',
+        'Eepisode': f"E{episode.zfill(2)}" if episode else ''
     }
-    
-    # Step 1: Apply the template
+
+    # Step 1: Apply the format
     try:
         new_filename = format_template.format(**format_vars)
     except KeyError as e:
         print(f"Invalid format variable: {e}")
-        return filename  # Fallback to original if format is invalid
-    
-    # Step 2: Clean empty sections (both [] and ())
-    new_filename = re.sub(r'\[[\s\-]*\]', '', new_filename)  # Empty []
-    new_filename = re.sub(r'\([\s\-]*\)', '', new_filename)  # Empty ()
-    new_filename = re.sub(r'\s{2,}', ' ', new_filename).strip()  # Extra spaces
-    
-    # Step 3: Add extension if not already in template
+        return filename  # Fallback to original filename
+
+    # Step 2: Remove empty brackets ([], (), etc.)
+    new_filename = re.sub(r'\[\s*[-]*\s*\]', '', new_filename)  # Remove empty []
+    new_filename = re.sub(r'\(\s*[-]*\s*\)', '', new_filename)  # Remove empty ()
+    new_filename = re.sub(r'\s{2,}', ' ', new_filename).strip()  # Collapse extra spaces
+
+    # Step 3: Append extension if not already in template
     if '{ext}' not in format_template:
         new_filename += ext
-    
+
     return new_filename
+
 def extract_chapter(filename):
     if not filename:
         return None
@@ -1963,7 +1970,6 @@ async def check_premium_mode():
 # Initialize
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
-DEFAULT_FORMAT = "[{title} - {season}-{episode}] [{quality}] [{audio}]"
 renaming_operations = {}
 active_sequences = {}
 message_ids = {}
