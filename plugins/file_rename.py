@@ -160,8 +160,21 @@ def parse_duration(arg):
 
 def extract_season_episode(filename):
     """Extract season and episode information from filename"""
-    for pattern, (season_group, episode_group) in SEASON_EPISODE_PATTERNS:
-        match = pattern.search(filename)
+    patterns = [
+        # Standard patterns (S01E02, S01-E02, S01_E02, etc.)
+        (r'S(\d{1,2})[_\-\s]*(?:E|EP|Episode)[_\-\s]*(\d{1,3})', ('season', 'episode')),
+        (r'S(\d{1,2})[_\-\s]+(\d{1,3})', ('season', 'episode')),
+        (r'(\d{1,2})x(\d{1,3})', ('season', 'episode')),
+        (r'\[S(\d{1,2})[-_](\d{1,3})\]', ('season', 'episode')),
+        (r'Season[_\-\s]*(\d{1,2})[_\-\s]*(?:Episode|EP|E)[_\-\s]*(\d{1,3})', ('season', 'episode')),
+        (r'\b(\d{1,2})[xX\-_](\d{1,3})\b', ('season', 'episode')),
+        # Episode only patterns
+        (r'\b(?:EP|Episode)[_\-\s]*(\d{1,3})\b', (None, 'episode')),
+        (r'\bE(\d{1,3})\b', (None, 'episode')),
+    ]
+    
+    for pattern, (season_group, episode_group) in patterns:
+        match = re.search(pattern, filename, re.IGNORECASE)
         if match:
             season = match.group(1).zfill(2) if season_group else None
             episode = match.group(2 if season_group else 1).zfill(2)
@@ -170,17 +183,37 @@ def extract_season_episode(filename):
 
 def extract_quality(filename):
     """Extract quality information from filename"""
-    for pattern, replacement in QUALITY_PATTERNS:
-        match = pattern.search(filename)
-        if match:
-            return replacement(match) if callable(replacement) else replacement
+    quality_map = {
+        r'\b(4k|2160p|uhd)\b': "2160p",
+        r'\b(1080p|fullhd|fhd)\b': "1080p",
+        r'\b(720p|hd)\b': "720p",
+        r'\b(480p|sd)\b': "480p",
+        r'\b(web[\-_]?dl|web[\-_]?rip)\b': "WEB-DL",
+        r'\b(blu[\-_]?ray|bdrip|brrip)\b': "BluRay",
+        r'\b(hdtv|dsr|pdtv)\b': "HDTV",
+        r'\b(dvdrip|dvdr)\b': "DVDrip",
+    }
+    
+    for pattern, quality in quality_map.items():
+        if re.search(pattern, filename, re.IGNORECASE):
+            return quality
     return None
+
 
 def extract_language(filename):
     """Extract language information from filename"""
+    language_map = {
+        r'\b(eng|english)\b': "ENG",
+        r'\b(jpn|japanese)\b': "JPN",
+        r'\b(tel|telugu)\b': "TEL",
+        r'\b(tam|tamil)\b': "TAM",
+        r'\b(hin|hindi)\b': "HIN",
+        r'\b(sub|dub|dual|multi)\b': lambda m: m.group(0).upper(),
+    }
+    
     languages = []
-    for pattern, replacement in LANGUAGE_PATTERNS:
-        match = pattern.search(filename)
+    for pattern, replacement in language_map.items():
+        match = re.search(pattern, filename, re.IGNORECASE)
         if match:
             lang = replacement(match) if callable(replacement) else replacement
             if lang not in languages:
@@ -273,38 +306,25 @@ def extract_metadata(filename):
     
     return metadata
 
-
 def clean_title(title):
     """Clean and format the title by removing unwanted patterns and special characters"""
     if not title:
-        return ""
+        return "Unknown"
+    
+    # Remove uploader tags (@username) and group tags ([AE])
+    title = re.sub(r'@[\w\-]+', '', title)
+    title = re.sub(r'\[[A-Z]{2,}\]', '', title)
     
     # Remove common unwanted patterns
-    patterns_to_remove = [
-        r'@[\w\-]+',       # Uploader tags (@username)
-        r'\[.*?\]',        # Anything in brackets (except quality/language tags we want to keep)
-        r'\(.*?\)',        # Anything in parentheses
-        r'[^\w\s\-\.\']',  # Special chars except spaces, hyphens, dots, and apostrophes
-        r'[\-_]+',         # Multiple underscores/hyphens
-        r'^\s+|\s+$',      # Leading/trailing spaces
-        r'\s+',            # Multiple spaces
-        r'\.(?=\w)',       # Dots before extensions
-    ]
+    title = re.sub(r'[_\-\s]+$', '', title)  # Trailing underscores/hyphens/spaces
+    title = re.sub(r'^[_\-\s]+', '', title)  # Leading underscores/hyphens/spaces
     
-    for pattern in patterns_to_remove:
-        title = re.sub(pattern, ' ', title, flags=re.IGNORECASE)
+    # Remove special characters except spaces, hyphens, and basic punctuation
+    title = re.sub(r'[^\w\s\-\.\'\:\,\!]+', ' ', title)
     
-    # Clean up common anime-related patterns
-    title = re.sub(r'\b(?:ep|episode|season|s)\b', ' ', title, flags=re.IGNORECASE)
-    title = re.sub(r'\b(?:sub|dub|dual|multi)\b', ' ', title, flags=re.IGNORECASE)
-    
-    # Standardize numbering formats
-    title = re.sub(r's(\d{1,2})\s*e(\d{1,3})', r'S\1E\2', title, flags=re.IGNORECASE)
-    title = re.sub(r'(\d{1,2})x(\d{1,3})', r'S\1E\2', title, flags=re.IGNORECASE)
-    
-    # Final cleanup
-    title = re.sub(r'\s+', ' ', title).strip()
-    title = title.title()  # Title case
+    # Clean up multiple spaces/hyphens
+    title = re.sub(r'[\-_]+', ' ', title)
+    title = re.sub(r'\s{2,}', ' ', title).strip()
     
     return title
 
@@ -428,37 +448,78 @@ def build_standardized_filename(title, season=None, episode=None, quality=None, 
     
     return filename
 
-def standardize_filename(filename):
-    """Convert filename to standardized format [S04-E02] Title [720p] [SUB].mkv"""
+def standardize_filename(filename, user_id=None, caption=None):
+    """Standardize filename to desired format"""
     try:
-        # Remove file extension temporarily
+        # Get the base name and extension
         base_name, ext = os.path.splitext(filename)
         ext = ext.lower()
         
+        # Use caption if available and metadata source is set to caption
+        source_text = caption if (caption and user_id and await DARKXSIDE78.get_metadata_source(user_id) == "caption") else filename
+        
         # Extract components
-        season, episode = extract_season_episode(base_name)
-        quality = extract_quality(base_name)
-        language = extract_language(base_name)
-        title = clean_title(base_name)
+        season, episode = extract_season_episode(source_text)
+        quality = extract_quality(source_text)
+        language = extract_language(source_text)
+        title = clean_title(source_text)
         
-        # Build new filename
-        parts = []
-        if season and episode:
-            parts.append(f"[S{season}-E{episode}]")
-        parts.append(title)
+        # Remove extracted components from title
+        if season or episode:
+            title = re.sub(r'S\d{1,2}[_\-\s]*(?:E|EP|Episode)[_\-\s]*\d{1,3}', '', title, flags=re.IGNORECASE)
+            title = re.sub(r'\d{1,2}x\d{1,3}', '', title, flags=re.IGNORECASE)
+            title = re.sub(r'\[S\d{1,2}[-_]\d{1,3}\]', '', title, flags=re.IGNORECASE)
+        
         if quality:
-            parts.append(f"[{quality}]")
+            title = re.sub(r'\b(?:720p|1080p|480p|2160p|4K|HD|SD)\b', '', title, flags=re.IGNORECASE)
+        
         if language:
-            parts.append(f"[{language}]")
+            title = re.sub(r'\b(?:Sub|Dub|Dual|Multi|ENG|JPN|TEL|TAM|HIN)\b', '', title, flags=re.IGNORECASE)
         
-        # Join parts and clean up
-        new_name = " ".join(parts).strip()
-        new_name = re.sub(r'\s+', ' ', new_name)  # Remove extra spaces
-        new_name = re.sub(r'\[\s+', '[', new_name)  # Clean brackets
-        new_name = re.sub(r'\s+\]', ']', new_name)
+        title = clean_title(title)
         
-        # Add extension back
-        return f"{new_name}{ext}"
+        # Build new filename based on user's template if available
+        if user_id:
+            template = await DARKXSIDE78.get_format_template(user_id)
+            if template:
+                format_vars = {
+                    'title': title,
+                    'season': season or '',
+                    'episode': episode or '',
+                    'quality': quality or '',
+                    'audio': language or '',
+                    'ext': ext.replace('.', ''),
+                }
+                try:
+                    new_name = template.format(**format_vars)
+                    # Clean empty brackets and extra spaces
+                    new_name = re.sub(r'\[\s*\]', '', new_name)
+                    new_name = re.sub(r'\(\s*\)', '', new_name)
+                    new_name = re.sub(r'\s{2,}', ' ', new_name).strip()
+                    if not new_name.lower().endswith(ext.lower()):
+                        new_name += ext
+                    return new_name
+                except (KeyError, ValueError):
+                    pass  # Fall back to default format if template fails
+        
+        # Default format if no template or template fails
+        parts = []
+        if title:
+            parts.append(title)
+        if season and episode:
+            parts.append(f"S{season}E{episode}")
+        elif episode:
+            parts.append(f"E{episode}")
+        if quality:
+            parts.append(quality)
+        if language:
+            parts.append(language)
+        
+        new_name = " - ".join(parts).strip()
+        if not new_name.lower().endswith(ext.lower()):
+            new_name += ext
+        
+        return new_name
     
     except Exception as e:
         logger.error(f"Error standardizing filename: {e}")
