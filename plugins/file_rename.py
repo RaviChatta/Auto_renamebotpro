@@ -246,7 +246,7 @@ def clean_title(title, early=False):
         return ""
     
     # Remove uploader tags first
-    title = re.sub(r'@[\w_]+', '', title, flags=re.IGNORECASE)
+    title = re.sub(r"[^\w\s'\-]", '', title, flags=re.IGNORECASE)
     
     # Early cleaning for extract_season_episode_title
     if early:
@@ -309,7 +309,7 @@ def format_title_case(title):
 
 def extract_season_episode_title(filename):
     if not filename:
-        return "01", "01", "Unknown"
+        return None, None, "Unknown"
 
     # Clean filename first to remove uploader tags and metadata
     filename_cleaned = clean_title(filename, early=True)
@@ -321,6 +321,9 @@ def extract_season_episode_title(filename):
             episode = match.group(2 if season_group else 1).zfill(2)
             title_part = (filename_cleaned[:match.start()] + " " + filename_cleaned[match.end():]).strip()
             return season, episode, title_part
+            
+    langs = ['tam', 'tel', 'hin', 'eng', 'jpn']
+    title = re.sub(rf'\b({"|".join(langs)})\b', '', title, flags=re.IGNORECASE)
 
     # Fallback for episode-only
     ep_match = re.search(r'\b(\d{1,3})\b', filename_cleaned)
