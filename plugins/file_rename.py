@@ -90,6 +90,7 @@ TITLE_CLEANING_PATTERNS = [
 
 # Utility Functions
 def check_ban_status(func):
+    from functools import wraps
     @wraps(func)
     async def wrapper(client, message, *args, **kwargs):
         user_id = message.from_user.id
@@ -209,21 +210,18 @@ def extract_languages(filename):
         'multi': 'Multi'
     }
     
-    # Handle bracketed language lists like [Telugu - Tamil - Hindi - English]
     bracketed_lang = re.search(r'\[([^\]]*?)\]', filename, re.IGNORECASE)
     languages = set()
     
     if bracketed_lang:
         lang_str = bracketed_lang.group(1)
-        # Split by - or spaces, and clean up
-        lang_list = re.split(r'[\s\-]+', lang_str.strip())
+        lang_list = re.split(r'[\s\-+]+', lang_str.strip())
         for lang in lang_list:
             lang = lang.strip().lower()
             if lang in language_map:
                 languages.add(language_map[lang])
         filename = filename.replace(bracketed_lang.group(0), '')
 
-    # Check for standalone language tags
     for lang in language_map:
         if re.search(rf'\b{lang}\b', filename, re.IGNORECASE):
             languages.add(language_map[lang])
@@ -234,18 +232,14 @@ def clean_title(title, early=False):
     if not title:
         return ""
     
-    # Apply cleaning patterns
     for pattern in TITLE_CLEANING_PATTERNS:
         title = pattern.sub(' ', title)
     
-    # Normalize spaces
     title = re.sub(r'\s+', ' ', title).strip()
     
-    # Early cleaning for season/episode extraction
     if early:
         return title
     
-    # Title case formatting
     return format_title_case(title)
 
 def format_title_case(title):
@@ -275,21 +269,34 @@ def format_title_case(title):
             formatted_words.append(word)
     
     return ' '.join(formatted_words)
-def build_standardized_filename(title, season=None, episode=None, quality=None, ext=".mkv"):
-    title = clean_title(title) or "Unknown"
-    parts = [title]
+
+def extract_chapter(filename):
+    if not filename:
+        return None
+
+    patterns = [
+        r'Ch(\d+)', r'Chapter(\d+)', r'CH(\d+)', 
+        r'ch(\d+)', r'Chap(\d+)', r'chap(\d+)',
+        r'Ch\.(\d+)', r'Chapter\.(\d+)', r'CH\.(\d+)',
+        r'ch\.(\d+)', r'Chap\.(\d+)', r'chap\.(\d+)',
+        r'Ch-(\d+)', r'Chapter-(\d+)', r'CH-(\d+)',
+        r'ch-(\d+)', r'Chap-(\d+)', r'chap-(\d+)',
+        r'CH-(\d+)', r'CHAP-(\d+)', r'CHAPTER (\d+)',
+        r'Ch (\d+)', r'Chapter (\d+)', r'CH (\d+)',
+        r'ch (\d+)', r'Chap (\d+)', r'chap (\d+)',
+        r'\[Ch(\d+)\]', r'\[Chapter(\d+)\]', r'\[CH(\d+)\]',
+        r'\[ch(\d+)\]', r'\[Chap(\d+)\]', r'\[chap(\d+)\]',
+        r'\[C(\d+)\]'
+    ]
     
-    if season and episode:
-        parts.append(f"S{season}E{episode}")
-    elif episode:
-        parts.append(f"E{episode}")
+    for pattern in patterns:
+        match = re.search(pattern, filename, re.IGNORECASE)
+        if match:
+            return match.group(1).zfill(2)
     
-    if quality and quality != "Unknown":
-        parts.append(quality)
-    
-    return " - ".join(parts) + ext
+    return None
+
 def extract_volume(filename):
-    """Extract volume number from filename"""
     if not filename:
         return None
 
@@ -312,7 +319,6 @@ def extract_volume(filename):
     return None
 
 async def detect_audio_info(file_path):
-    """Detect audio streams information using FFprobe"""
     ffprobe = shutil.which('ffprobe')
     if not ffprobe:
         raise RuntimeError("ffprobe not found in PATH")
@@ -359,7 +365,6 @@ async def detect_audio_info(file_path):
         return 0, 0, 0, 0, 0
 
 def get_audio_label(audio_info):
-    """Get audio label based on audio stream information"""
     audio_count, sub_count, jp_audio, en_audio, en_subs = audio_info
     
     if audio_count == 1:
@@ -378,7 +383,6 @@ def get_audio_label(audio_info):
     return "Unknown"
 
 async def detect_video_resolution(file_path):
-    """Detect actual video resolution using FFmpeg"""
     ffprobe = shutil.which('ffprobe')
     if not ffprobe:
         raise RuntimeError("ffprobe not found in PATH")
@@ -433,23 +437,7 @@ async def detect_video_resolution(file_path):
         logger.error(f"Resolution detection error: {e}")
         return "Unknown"
 
-
-async def process_thumbnail(thumb_path):
-    """Process and resize thumbnail"""
-    if not thumb_path or not await aiofiles.os.path.exists(thumb_path):
-        return None
-    try:
-        img = await asyncio.to_thread(Image.open, thumb_path)
-        img = await asyncio.to_thread(lambda: img.convert("RGB").resize((320, 320)))
-        await asyncio.to_thread(img.save, thumb_path, "JPEG")
-        return thumb_path
-    except Exception as e:
-        logger.error(f"Thumbnail processing failed: {e}")
-        await cleanup_files(thumb_path)
-        return None
-
 async def cleanup_files(*paths):
-    """Clean up temporary files"""
     for path in paths:
         try:
             if path and await aiofiles.os.path.exists(path):
@@ -457,8 +445,36 @@ async def cleanup_files(*paths):
         except Exception as e:
             logger.error(f"Error removing {path}: {e}")
 
+async def convert_to_mkv(input_path, output_path):
+    ffmpeg = shutil.which('ffmpeg')
+    if not ffmpeg:
+        raise RuntimeError("FFmpeg not found in PATH")
+
+    cmd = [
+        ffmpeg,
+        '-hide_banner',
+        '-i', input_path,
+        '-map', '0',
+        '-c', 'copy',
+        '-f', 'matroska',
+        '-y',
+        output_path
+    ]
+
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    _, stderr = await process.communicate()
+
+    if process.returncode != 0:
+        error_msg = stderr.decode().strip()
+        raise RuntimeError(f"MKV conversion failed: {error_msg}")
+    
+    return output_path
+
 async def add_metadata(input_path, output_path, user_id):
-    """Add metadata to media files"""
     ffmpeg = shutil.which('ffmpeg')
     if not ffmpeg:
         raise RuntimeError("FFmpeg not found in PATH")
@@ -510,10 +526,8 @@ async def add_metadata(input_path, output_path, user_id):
         if process.returncode != 0:
             error_msg = stderr.decode().strip()
             logger.error(f"FFmpeg error: {error_msg}")
-            
             if await aiofiles.os.path.exists(output_path):
                 await aiofiles.os.remove(output_path)
-            
             raise RuntimeError(f"Metadata addition failed: {error_msg}")
 
         return output_path
@@ -523,49 +537,33 @@ async def add_metadata(input_path, output_path, user_id):
         await cleanup_files(output_path)
         raise
 
-async def convert_to_mkv(input_path, output_path):
-    """Convert video file to MKV format"""
-    ffmpeg = shutil.which('ffmpeg')
-    if not ffmpeg:
-        raise RuntimeError("FFmpeg not found in PATH")
-
-    cmd = [
-        ffmpeg,
-        '-hide_banner',
-        '-i', input_path,
-        '-map', '0',
-        '-c', 'copy',
-        '-f', 'matroska',
-        '-y',
-        output_path
-    ]
-
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    _, stderr = await process.communicate()
-
-    if process.returncode != 0:
-        error_msg = stderr.decode().strip()
-        raise RuntimeError(f"MKV conversion failed: {error_msg}")
+def build_standardized_filename(title, season=None, episode=None, quality=None, ext=".mkv"):
+    title = clean_title(title) or "Unknown"
+    parts = [title]
     
-    return output_path
+    if season and episode:
+        parts.append(f"S{season}E{episode}")
+    elif episode:
+        parts.append(f"E{episode}")
+    
+    if quality and quality != "Unknown":
+        parts.append(quality)
+    
+    return " - ".join(parts) + ext
 
 # Task Queue Implementation
 class TaskQueue:
     def __init__(self):
-        self.queues: Dict[int, Deque[Tuple[str, Message, asyncio.coroutine]]] = {}
-        self.processing: Dict[int, Set[str]] = {}
-        self.tasks: Dict[str, asyncio.Task] = {}
+        self.queues = {}
+        self.processing = {}
+        self.tasks = {}
         self.max_retries = 3
-        self.locks: Dict[int, asyncio.Lock] = {}
-        self.active_processors: Set[int] = set()
+        self.locks = {}
+        self.active_processors = set()
 
-    async def add_task(self, user_id: int, file_id: str, message: Message, coro):
+    async def add_task(self, user_id: int, file_id: str, message: Message, coro_func):
         if ADMIN_MODE and user_id not in ADMINS:
-            await message.reply_text("Aᴅᴍɪɴ ᴍᴏᴅᴇ ᴀᴄᴛɪᴠᴇ - Oɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ǫᴜᴇᴜᴇ ғɪʟᴇs!")
+            await message.reply_text("Aᴅᴍɪɴ ᴍᴏᴅᴇ ᴀᴄᴛɪᴠᴇ - Oɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜɪs ʙᴏᴛ!")
             return
 
         async with self.locks.setdefault(user_id, asyncio.Lock()):
@@ -573,7 +571,7 @@ class TaskQueue:
                 self.queues[user_id] = deque()
                 self.processing[user_id] = set()
 
-            self.queues[user_id].append((file_id, message, coro))
+            self.queues[user_id].append((file_id, message, coro_func))
 
         if user_id not in USER_SEMAPHORES:
             concurrency_limit = CON_LIMIT_ADMIN if user_id in Config.ADMIN else CON_LIMIT_NORMAL
@@ -591,7 +589,7 @@ class TaskQueue:
                 async with self.locks[user_id]:
                     if not self.queues.get(user_id):
                         break
-                    file_id, message, coro = self.queues[user_id].popleft()
+                    file_id, message, coro_func = self.queues[user_id].popleft()
                     self.processing[user_id].add(file_id)
 
                 semaphore = USER_SEMAPHORES.get(user_id)
@@ -603,7 +601,8 @@ class TaskQueue:
                     try:
                         for attempt in range(self.max_retries):
                             try:
-                                task = asyncio.create_task(coro)
+                                # Create a new coroutine instance for each attempt
+                                task = asyncio.create_task(coro_func())
                                 self.tasks[task_id] = task
                                 await task
                                 break
@@ -798,6 +797,7 @@ async def end_sequence(client, message: Message):
         logger.error(f"Sequence processing failed: {e}")
         await message.reply_text("**Fᴀɪʟᴇᴅ ᴛᴏ ᴘʀᴏᴄᴇss sᴇǫᴜᴇɴᴄᴇ! Cʜᴇᴄᴋ ʟᴏɢs ғᴏʀ ᴅᴇᴛᴀɪʟs.**")
 
+# Message Handlers
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
 @check_ban_status
 async def auto_rename_files(client, message: Message):
@@ -853,7 +853,6 @@ async def auto_rename_files(client, message: Message):
             media_preference = await DARKXSIDE78.get_media_preference(user_id)
             user_data = await DARKXSIDE78.col.find_one({"_id": user_id})
             is_premium = user_data.get("is_premium", False) if user_data else False
-            is_admin = hasattr(Config, "ADMIN") and user_id in Config.ADMIN
             
             premium_expiry = user_data.get("premium_expiry")
             if is_premium and premium_expiry:
@@ -882,7 +881,6 @@ async def auto_rename_files(client, message: Message):
                 )
             
             format_template = await DARKXSIDE78.get_format_template(user_id)
-            media_preference = await DARKXSIDE78.get_media_preference(user_id)
             metadata_source = await DARKXSIDE78.get_metadata_source(user_id)
             if metadata_source == "caption" and message.caption:
                 source_text = message.caption
@@ -893,6 +891,8 @@ async def auto_rename_files(client, message: Message):
             chapter = extract_chapter(source_text)
             volume = extract_volume(source_text)
             quality = extract_quality(source_text)
+            audio_label = ""
+            actual_resolution = "Unknown"
 
             if not format_template:
                 return await message.reply_text("**Aᴜᴛᴏ ʀᴇɴᴀᴍᴇ ғᴏʀᴍᴀᴛ ɴᴏᴛ sᴇᴛ\nPʟᴇᴀsᴇ sᴇᴛ ᴀ ʀᴇɴᴀᴍᴇ ғᴏʀᴍᴀᴛ ᴜsɪɴɢ /autorename**")
@@ -904,348 +904,281 @@ async def auto_rename_files(client, message: Message):
 
             renaming_operations[file_id] = datetime.now()
             
-            try:
-                audio_label = ""
+            if media_type == "video" and media_preference == "document":
+                ext = ".mkv"
+            elif media_type == "document" and media_preference == "video":
+                ext = ".mp4"
+            elif file_ext and file_ext.lower() == ".pdf":
+                ext = ".pdf"
+            else:
+                ext = os.path.splitext(file_name)[1] or ('.mp4' if media_type == 'video' else '.mp3')
                 
-                if media_type == "video" and media_preference == "document":
-                    ext = ".mkv"
-                elif media_type == "document" and media_preference == "video":
-                    ext = ".mp4"
-                elif file_ext and file_ext.lower() == ".pdf":
-                    ext = ".pdf"
-                else:
-                    ext = os.path.splitext(file_name)[1] or ('.mp4' if media_type == 'video' else '.mp3')
-                
-                download_path = f"downloads/{file_name}"
-                metadata_path = f"metadata/{file_name}"
-                output_path = f"processed/{os.path.splitext(file_name)[0]}{ext}"
-                
-                await aiofiles.os.makedirs(os.path.dirname(download_path), exist_ok=True)
-                await aiofiles.os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
-                await aiofiles.os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            download_path = f"downloads/{file_name}"
+            metadata_path = f"metadata/{file_name}"
+            output_path = f"processed/{os.path.splitext(file_name)[0]}{ext}"
+            
+            await aiofiles.os.makedirs(os.path.dirname(download_path), exist_ok=True)
+            await aiofiles.os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
+            await aiofiles.os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-                msg = await message.reply_text("**Dᴏᴡɴʟᴏᴀᴅɪɴɢ...**")
-                try:
-                    file_path = await client.download_media(
-                        message,
-                        file_name=download_path,
-                        progress=progress_for_pyrogram,
-                        progress_args=("**Dᴏᴡɴʟᴏᴀᴅɪɴɢ...**", msg, time.time())
-                    )
-                except Exception as e:
-                    await msg.edit(f"Dᴏᴡɴʟᴏᴀᴅ ғᴀɪʟᴇᴅ: {e}")
-                    raise
-                
-                await asyncio.sleep(1)
-                await msg.edit("**Dᴏᴡɴʟᴏᴀᴅɪɴɢ Cᴏᴍᴘʟᴇᴛᴇ**")
+            msg = await message.reply_text("**Dᴏᴡɴʟᴏᴀᴅɪɴɢ...**")
+            try:
+                file_path = await client.download_media(
+                    message,
+                    file_name=download_path,
+                    progress=progress_for_pyrogram,
+                    progress_args=("**Dᴏᴡɴʟᴏᴀᴅɪɴɢ...**", msg, time.time())
+                )
+            except Exception as e:
+                await msg.edit(f"Dᴏᴡɴʟᴏᴀᴅ ғᴀɪʟᴇᴅ: {e}")
+                raise
+            
+            await asyncio.sleep(1)
+            await msg.edit("**Dᴏᴡɴʟᴏᴀᴅɪɴɢ Cᴏᴍᴘʟᴇᴛᴇ**")
+            
+            if media_type in ["video", "audio"]:
                 audio_info = await detect_audio_info(file_path)
                 audio_label = get_audio_label(audio_info)
-                actual_resolution = await detect_video_resolution(file_path)
+                if media_type == "video":
+                    actual_resolution = await detect_video_resolution(file_path)
 
-                replacements = {
-                    '{season}': season or 'XX',
-                    '{episode}': episode or 'XX',
-                    '{chapter}': chapter or 'XX',
-                    '{volume}': volume or 'XX',
-                    '{quality}': quality,
-                    '{audio}': audio_label,
-                    '{title}': title,
-                    '{Season}': season or 'XX',
-                    '{Episode}': episode or 'XX',
-                    '{Chapter}': chapter or 'XX',
-                    '{Volume}': volume or 'XX',
-                    '{Quality}': quality,
-                    '{Audio}': audio_label,
-                    '{Title}': title,
-                    '{SEASON}': season or 'XX',
-                    '{EPISODE}': episode or 'XX',
-                    '{CHAPTER}': chapter or 'XX',
-                    '{VOLUME}': volume or 'XX',
-                    '{QUALITY}': quality,
-                    '{AUDIO}': audio_label,
-                    '{TITLE}': title,
-                    'Season': season or 'XX',
-                    'Episode': episode or 'XX',
-                    'Chapter': chapter or 'XX',
-                    'Volume': volume or 'XX',
-                    'Quality': quality,
-                    'Audio': audio_label,
-                    'Title': title,
-                    'SEASON': season or 'XX',
-                    'EPISODE': episode or 'XX',
-                    'CHAPTER': chapter or 'XX',
-                    'VOLUME': volume or 'XX',
-                    'QUALITY': quality,
-                    'AUDIO': audio_label,
-                    'TITLE': title,
-                    'season': season or 'XX',
-                    'episode': episode or 'XX',
-                    'chapter': chapter or 'XX',
-                    'volume': volume or 'XX',
-                    'quality': quality,
-                    'audio': audio_label,
-                    'title': title,
-                    '{resolution}': actual_resolution,
-                    '{Resolution}': actual_resolution,
-                    '{RESOLUTION}': actual_resolution,
-                    'resolution': actual_resolution,
-                    'Resolution': actual_resolution,
-                    'RESOLUTION': actual_resolution,
-                }
-                
-                for ph, val in replacements.items():
-                    format_template = format_template.replace(ph, val)
+            replacements = {
+                '{season}': season or 'XX',
+                '{episode}': episode or 'XX',
+                '{chapter}': chapter or 'XX',
+                '{volume}': volume or 'XX',
+                '{quality}': quality,
+                '{audio}': audio_label,
+                '{title}': title,
+                '{resolution}': actual_resolution,
+                '{Season}': season or 'XX',
+                '{Episode}': episode or 'XX',
+                '{Chapter}': chapter or 'XX',
+                '{Volume}': volume or 'XX',
+                '{Quality}': quality,
+                '{Audio}': audio_label,
+                '{Title}': title,
+                '{Resolution}': actual_resolution,
+                'season': season or 'XX',
+                'episode': episode or 'XX',
+                'chapter': chapter or 'XX',
+                'volume': volume or 'XX',
+                'quality': quality,
+                'audio': audio_label,
+                'title': title,
+                'resolution': actual_resolution,
+                'Season': season or 'XX',
+                'Episode': episode or 'XX',
+                'Chapter': chapter or 'XX',
+                'Volume': volume or 'XX',
+                'Quality': quality,
+                'Audio': audio_label,
+                'Title': title,
+                'Resolution': actual_resolution,
+                'SEASON': season or 'XX',
+                'EPISODE': episode or 'XX',
+                'CHAPTER': chapter or 'XX',
+                'VOLUME': volume or 'XX',
+                'QUALITY': quality,
+                'AUDIO': audio_label,
+                'TITLE': title,
+                'RESOLUTION': actual_resolution
+            }
+            
+            # Use build_standardized_filename for consistent naming
+            new_filename = build_standardized_filename(
+                title=title,
+                season=season,
+                episode=episode,
+                quality=quality if quality != "Unknown" else actual_resolution,
+                ext=ext
+            )
 
-                new_filename = f"{format_template.format(**replacements)}{ext}"
-                new_download = os.path.join("downloads", new_filename)
-                new_metadata = os.path.join("metadata", new_filename)
-                new_output = os.path.join("processed", new_filename)
+            new_download = os.path.join("downloads", new_filename)
+            new_metadata = os.path.join("metadata", new_filename)
+            new_output = os.path.join("processed", new_filename)
 
-                await aiofiles.os.rename(download_path, new_download)
-                download_path = new_download
-                metadata_path = new_metadata
-                output_path = new_output
+            await aiofiles.os.rename(download_path, new_download)
+            download_path = new_download
+            metadata_path = new_metadata
+            output_path = new_output
 
-                await msg.edit("**Pʀᴏᴄᴇssɪɴɢ ғɪʟᴇ...**")
-                
-                if media_type == "video" and media_preference == "document":
-                    try:
-                        await convert_to_mkv(download_path, output_path)
-                        file_path = output_path
-                    except Exception as e:
-                        await msg.edit(f"Vɪᴅᴇᴏ ᴄᴏɴᴠᴇʀsɪᴏɴ ғᴀɪʟᴇᴅ: {e}")
-                        raise
-                else:
-                    file_path = download_path
-
-                if (media_type in ["video", "audio"] or 
-                    (media_type == "document" and file_ext != ".pdf")):
-                    try:
-                        await msg.edit("**Aᴅᴅɪɴɢ ᴍᴇᴛᴀᴅᴀᴛᴀ...**")
-                        await add_metadata(
-                            file_path if media_type == "video" else download_path,
-                            metadata_path, 
-                            user_id
-                        )
-                        file_path = metadata_path
-                    except Exception as e:
-                        await msg.edit(f"Mᴇᴛᴀᴅᴀᴛᴀ ғᴀɪʟᴇᴅ: {e}")
-                        raise
-                else:
-                    if media_type == "document" and file_ext == ".pdf":
-                        pdf_banner_on = await DARKXSIDE78.get_pdf_banner_mode(user_id)
-                        pdf_banner_file = await DARKXSIDE78.get_pdf_banner(user_id)
-                        pdf_lock_on = await DARKXSIDE78.get_pdf_lock_mode(user_id)
-                        pdf_lock_password = await DARKXSIDE78.get_pdf_lock_password(user_id)
-                        pdf_banner_placement = await DARKXSIDE78.get_pdf_banner_placement(user_id) or "first"
-
-                        if pdf_banner_on and pdf_banner_file:
-                            try:
-                                temp_banner_path = f"{download_path}_banner.jpg"
-                                await client.download_media(pdf_banner_file, file_name=temp_banner_path)
-                                reader = PdfReader(download_path)
-                                writer = PdfWriter()
-                                img = Image.open(temp_banner_path).convert("RGB")
-                                img_pdf_path = temp_banner_path + ".pdf"
-                                img.save(img_pdf_path, "PDF")
-                                img_reader = PdfReader(img_pdf_path)
-                                img_page = img_reader.pages[0]
-                                if pdf_banner_placement == "first":
-                                    writer.add_page(img_page)
-                                    for page in reader.pages:
-                                        writer.add_page(page)
-                                elif pdf_banner_placement == "last":
-                                    for page in reader.pages:
-                                        writer.add_page(page)
-                                    writer.add_page(img_page)
-                                elif pdf_banner_placement == "both":
-                                    writer.add_page(img_page)
-                                    for page in reader.pages:
-                                        writer.add_page(page)
-                                    writer.add_page(img_page)
-                                else:
-                                    writer.add_page(img_page)
-                                    for page in reader.pages:
-                                        writer.add_page(page)
-                                bannered_pdf_path = download_path.replace(".pdf", "_bannered.pdf")
-                                with open(bannered_pdf_path, "wb") as f:
-                                    writer.write(f)
-                                await cleanup_files(download_path, temp_banner_path, img_pdf_path)
-                                download_path = bannered_pdf_path
-                            except Exception as e:
-                                logger.error(f"Auto PDF banner failed: {e}")
-
-                        if pdf_lock_on and pdf_lock_password:
-                            try:
-                                reader = PdfReader(download_path)
-                                writer = PdfWriter()
-                                for page in reader.pages:
-                                    writer.add_page(page)
-                                writer.encrypt(pdf_lock_password)
-                                locked_pdf_path = download_path.replace(".pdf", "_locked.pdf")
-                                with open(locked_pdf_path, "wb") as f:
-                                    writer.write(f)
-                                await cleanup_files(download_path)
-                                download_path = locked_pdf_path
-                            except Exception as e:
-                                logger.error(f"Auto PDF lock failed: {e}")
-
-                        file_path = download_path
-                        await aiofiles.os.rename(download_path, output_path)
-                        file_path = output_path
-
-                await msg.edit("**Pʀᴇᴘᴀʀɪɴɢ ᴜᴘʟᴏᴀᴅ...**")
-                await DARKXSIDE78.col.update_one(
-                    {"_id": user_id},
-                    {
-                        "$inc": {
-                            "rename_count": 1,
-                            "total_renamed_size": message.document.file_size if media_type == "document" else 
-                                                 message.video.file_size if media_type == "video" else 
-                                                 message.audio.file_size,
-                            "daily_count": 1
-                        },
-                        "$max": {
-                            "max_file_size": message.document.file_size if media_type == "document" else 
-                                            message.video.file_size if media_type == "video" else 
-                                            message.audio.file_size
-                        }
-                    }
-                )
-
-                caption = await DARKXSIDE78.get_caption(message.chat.id) or f"**{new_filename}**"
-                thumb = await DARKXSIDE78.get_thumbnail(message.chat.id)
-                thumb_path = None
-
-                if thumb:
-                    thumb_path = await client.download_media(thumb)
-                elif media_type == "video" and message.video.thumbs:
-                    thumb_path = await client.download_media(message.video.thumbs[0].file_id)
-
-                await msg.edit("**Uᴘʟᴏᴀᴅɪɴɢ...**")
+            await msg.edit("**Pʀᴏᴄᴇssɪɴɢ ғɪʟᴇ...**")
+            
+            if media_type == "video" and media_preference == "document":
                 try:
-                    upload_params = {
-                        'chat_id': message.chat.id,
-                        'caption': caption,
-                        'thumb': thumb_path,
-                        'progress': progress_for_pyrogram,
-                        'progress_args': ("Uᴘʟᴏᴀᴅɪɴɢ...", msg, time.time())
-                    }
+                    await convert_to_mkv(download_path, output_path)
+                    file_path = output_path
+                except Exception as e:
+                    await msg.edit(f"Vɪᴅᴇᴏ ᴄᴏɴᴠᴇʀsɪᴏɴ ғᴀɪʟᴇᴅ: {e}")
+                    raise
+            else:
+                file_path = download_path
 
-                    if file_ext in (
-                        ".pdf", ".txt", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
-                        ".odt", ".rtf", ".csv", ".epub", ".mobi", ".zip", ".rar", ".7z",
-                        ".xml", ".html", ".json", ".md", ".log", ".ini", ".bat", ".sh"
-                    ):
-                        await client.send_document(
+            if media_type in ["video", "audio"]:
+                try:
+                    await msg.edit("**Aᴅᴅɪɴɢ ᴍᴇᴛᴀᴅᴀᴛᴀ...**")
+                    await add_metadata(
+                        file_path if media_type == "video" else download_path,
+                        metadata_path, 
+                        user_id
+                    )
+                    file_path = metadata_path
+                except Exception as e:
+                    await msg.edit(f"Mᴇᴛᴀᴅᴀᴛᴀ ғᴀɪʟᴇᴅ: {e}")
+                    raise
+            else:
+                file_path = download_path
+                await aiofiles.os.rename(download_path, output_path)
+                file_path = output_path
+
+            await msg.edit("**Pʀᴇᴘᴀʀɪɴɢ ᴜᴘʟᴏᴀᴅ...**")
+            await DARKXSIDE78.col.update_one(
+                {"_id": user_id},
+                {
+                    "$inc": {
+                        "rename_count": 1,
+                        "total_renamed_size": message.document.file_size if media_type == "document" else 
+                                             message.video.file_size if media_type == "video" else 
+                                             message.audio.file_size,
+                        "daily_count": 1
+                    },
+                    "$max": {
+                        "max_file_size": message.document.file_size if media_type == "document" else 
+                                        message.video.file_size if media_type == "video" else 
+                                        message.audio.file_size
+                    }
+                }
+            )
+
+            caption = await DARKXSIDE78.get_caption(message.chat.id) or f"**{new_filename}**"
+            thumb = await DARKXSIDE78.get_thumbnail(message.chat.id)
+            thumb_path = None
+
+            if thumb:
+                thumb_path = await client.download_media(thumb)
+            elif media_type == "video" and message.video.thumbs:
+                thumb_path = await client.download_media(message.video.thumbs[0].file_id)
+
+            await msg.edit("**Uᴘʟᴏᴀᴅɪɴɢ...**")
+            try:
+                upload_params = {
+                    'chat_id': message.chat.id,
+                    'caption': caption,
+                    'thumb': thumb_path,
+                    'progress': progress_for_pyrogram,
+                    'progress_args': ("Uᴘʟᴏᴀᴅɪɴɢ...", msg, time.time())
+                }
+
+                if file_ext in (
+                    ".pdf", ".txt", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+                    ".odt", ".rtf", ".csv", ".epub", ".mobi", ".zip", ".rar", ".7z",
+                    ".xml", ".html", ".json", ".md", ".log", ".ini", ".bat", ".sh"
+                ):
+                    await client.send_document(
                         document=file_path,
                         **upload_params
-                        )
-                    elif media_type == "video":
-                        if media_preference == "video":
-                            await client.send_video(
-                                video=file_path,
-                                **upload_params
-                            )
-                        else:
-                            await client.send_document(
-                                document=file_path,
-                                force_document=True,
-                                **upload_params
-                            )
-                    elif media_type == "document":
-                        if media_preference == "video":
-                            await client.send_video(
-                                video=file_path,
-                                **upload_params
-                            )
-                        else:
-                            await client.send_document(
-                                document=file_path,
-                                **upload_params
-                            )
-                    elif media_type == "audio":
-                        await client.send_audio(
-                            audio=file_path,
+                    )
+                elif media_type == "video":
+                    if media_preference == "video":
+                        await client.send_video(
+                            video=file_path,
                             **upload_params
                         )
-                    new_file_name = new_filename
+                    else:
+                        await client.send_document(
+                            document=file_path,
+                            force_document=True,
+                            **upload_params
+                        )
+                elif media_type == "document":
+                    if media_preference == "video":
+                        await client.send_video(
+                            video=file_path,
+                            **upload_params
+                        )
+                    else:
+                        await client.send_document(
+                            document=file_path,
+                            **upload_params
+                        )
+                elif media_type == "audio":
+                    await client.send_audio(
+                        audio=file_path,
+                        **upload_params
+                    )
 
-                    await DARKXSIDE78.add_rename_history(user_id, original_name=file_name, renamed_name=new_file_name)
+                await DARKXSIDE78.add_rename_history(user_id, original_name=file_name, renamed_name=new_filename)
 
-                    if Config.DUMP:
-                        try:
-                            ist = pytz.timezone('Asia/Kolkata')
-                            current_time = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S IST")
-                            
-                            full_name = user.first_name
-                            if user.last_name:
-                                full_name += f" {user.last_name}"
-                            username = f"@{user.username}" if user.username else "N/A"
-                            premium_status = '🗸' if is_premium else '✘'
-                            
-                            dump_caption = (
-                                f"» Usᴇʀ Dᴇᴛᴀɪʟs «\n"
-                                f"ID: {user_id}\n"
-                                f"Nᴀᴍᴇ: {full_name}\n"
-                                f"Usᴇʀɴᴀᴍᴇ: {username}\n"
-                                f"Pʀᴇᴍɪᴜᴍ: {premium_status}\n"
-                                f"Tɪᴍᴇ: {current_time}\n"
-                                f"Oʀɪɢɪɴᴀʟ Fɪʟᴇɴᴀᴍᴇ: {file_name}\n"
-                                f"Rᴇɴᴀᴍᴇᴅ Fɪʟᴇɴᴀᴍᴇ: {new_filename}"
+                if Config.DUMP:
+                    try:
+                        ist = pytz.timezone('Asia/Kolkata')
+                        current_time = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S IST")
+                        
+                        full_name = user.first_name
+                        if user.last_name:
+                            full_name += f" {user.last_name}"
+                        username = f"@{user.username}" if user.username else "N/A"
+                        premium_status = '🗸' if is_premium else '✘'
+                        
+                        dump_caption = (
+                            f"» Usᴇʀ Dᴇᴛᴀɪʟs «\n"
+                            f"ID: {user_id}\n"
+                            f"Nᴀᴍᴇ: {full_name}\n"
+                            f"Usᴇʀɴᴀᴍᴇ: {username}\n"
+                            f"Pʀᴇᴍɪᴜᴍ: {premium_status}\n"
+                            f"Tɪᴍᴇ: {current_time}\n"
+                            f"Oʀɪɢɪɴᴀʟ Fɪʟᴇɴᴀᴍᴇ: {file_name}\n"
+                            f"Rᴇɴᴀᴍᴇᴅ Fɪʟᴇɴᴀᴍᴇ: {new_filename}"
+                        )
+                        
+                        dump_channel = Config.DUMP_CHANNEL
+                        await asyncio.sleep(1.2)
+                        if media_type == "document":
+                            await client.copy_message(
+                                chat_id=dump_channel,
+                                from_chat_id=message.chat.id,
+                                message_id=message.id,
+                                caption=dump_caption
                             )
-                            
-                            dump_channel = Config.DUMP_CHANNEL
-                            await asyncio.sleep(1.2)
-                            if media_type == "document":
-                                await client.copy_message(
-                                    chat_id=dump_channel,
-                                    from_chat_id=message.chat.id,
-                                    message_id=message.id,
-                                    caption=dump_caption
-                                )
-                            elif media_type == "video":
-                                await client.copy_message(
-                                    chat_id=dump_channel,
-                                    from_chat_id=message.chat.id,
-                                    message_id=message.id,
-                                    caption=dump_caption
-                                )
-                            elif media_type == "audio":
-                                await client.copy_message(
-                                    chat_id=dump_channel,
-                                    from_chat_id=message.chat.id,
-                                    message_id=message.id,
-                                    caption=dump_caption
-                                )
-                        except Exception as e:
-                            logger.error(f"Error sending to dump channel: {e}")
+                        elif media_type == "video":
+                            await client.copy_message(
+                                chat_id=dump_channel,
+                                from_chat_id=message.chat.id,
+                                message_id=message.id,
+                                caption=dump_caption
+                            )
+                        elif media_type == "audio":
+                            await client.copy_message(
+                                chat_id=dump_channel,
+                                from_chat_id=message.chat.id,
+                                message_id=message.id,
+                                caption=dump_caption
+                            )
+                    except Exception as e:
+                        logger.error(f"Error sending to dump channel: {e}")
 
-                    await msg.delete()
-                except Exception as e:
-                    await msg.edit(f"Uᴘʟᴏᴀᴅ ғᴀɪʟᴇᴅ: {e}")
-                    raise
-
+                await msg.delete()
             except Exception as e:
-                logger.error(f"Processing error: {e}")
-                await message.reply_text(f"Eʀʀᴏʀ: {str(e)}")
-            finally:
-                await cleanup_files(download_path, metadata_path, thumb_path, output_path)
-                renaming_operations.pop(file_id, None)
-                
+                await msg.edit(f"Uᴘʟᴏᴀᴅ ғᴀɪʟᴇᴅ: {e}")
+                raise
+
         except asyncio.CancelledError:
             logger.info(f"Task for file {file_id} was cancelled")
             if file_path or download_path or metadata_path or thumb_path or output_path:
                 await cleanup_files(download_path, metadata_path, thumb_path, output_path)
             renaming_operations.pop(file_id, None)
             raise
-    
+        finally:
+            await cleanup_files(download_path, metadata_path, thumb_path, output_path)
+            renaming_operations.pop(file_id, None)
+
     status = await task_queue.get_queue_status(user_id)
     msg = await message.reply_text(
         f"**Yᴏᴜʀ ꜰɪʟᴇ ʜᴀs ʙᴇᴇɴ ᴀᴅᴅᴇᴅ ᴛᴏ qᴜᴇᴜᴇ {status['processing']}. Pʟᴇᴀsᴇ Wᴀɪᴛ.......**"
     )
     
-    await task_queue.add_task(user_id, file_id, message, process_file())
+    await task_queue.add_task(user_id, file_id, message, process_file)
 
 # PDF Related Handlers
 @Client.on_message(filters.command("pdf_replace") & filters.reply)
