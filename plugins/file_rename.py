@@ -1515,18 +1515,19 @@ async def ffmpeg_upscale_photo(client, message):
             if path and os.path.exists(path):
                 os.remove(path)
 
+
 @Client.on_message(filters.command("admin_mode"))
 async def admin_mode(client, message):
     global ADMIN_MODE
     user_id = message.from_user.id
     if user_id not in ADMINS:
         return await message.reply("Aᴅᴍɪɴ ᴏɴʟʏ ᴄᴏᴍᴍᴀɴᴅ!")
-    
+
     args = message.text.split()
     if len(args) < 2:
         mode = "on" if ADMIN_MODE else "off"
         return await message.reply(f"Aᴅᴍɪɴ Mᴏᴅᴇ ɪs ᴄᴜʀʀᴇɴᴛʟʏ {mode}")
-    
+
     if args[1].lower() in ("on", "yes", "true"):
         ADMIN_MODE = True
         await message.reply("Aᴅᴍɪɴ Mᴏᴅᴇ ᴇɴᴀʙʟᴇᴅ - Oɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜᴇ ʙᴏᴛ")
@@ -1538,7 +1539,7 @@ async def admin_mode(client, message):
 async def add_admin(client, message):
     if message.from_user.id not in ADMINS:
         return
-    
+
     try:
         target = message.text.split()[1]
         if target.startswith("@"):
@@ -1562,11 +1563,11 @@ async def global_premium_control(client, message: Message):
     args = message.command[1:]
     if not args:
         status = "ON" if PREMIUM_MODE else "OFF"
-        expiry = f" (expires {PREMIUM_MODE_EXPIRY:%Y-%m-%d %H:%M})" if PREMIUM_MODE_EXPIRY else ""
+        expiry = f" (expires {PREMIUM_MODE_EXPIRY:%Y-%m-%d %H:%M})" if isinstance(PREMIUM_MODE_EXPIRY, datetime) else ""
         return await message.reply_text(
             f"**➠ Cᴜʀʀᴇɴᴛ Tᴏᴋᴇɴ Usᴀɢᴇ: {status}{expiry}**\n\n"
             "**Usᴀɢᴇ:**\n"
-            "`/token_usage on [days|12m|1y]`  — Eɴᴀʙʟᴇ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ\n"
+            "`/token_usage on [days|12m|1y]` — Eɴᴀʙʟᴇ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ\n"
             "`/token_usage off [days|12m|1y]` — Dɪsᴀʙʟᴇ ᴛᴏᴋᴇɴ ᴜsᴀɢᴇ"
         )
 
@@ -1596,6 +1597,23 @@ async def global_premium_control(client, message: Message):
     )
     await message.reply_text(msg)
 
+async def check_premium_mode():
+    global PREMIUM_MODE, PREMIUM_MODE_EXPIRY
+
+    settings = await DARKXSIDE78.global_settings.find_one({"_id": "premium_mode"})
+    if not settings:
+        return
+
+    PREMIUM_MODE = settings.get("status", True)
+    PREMIUM_MODE_EXPIRY = settings.get("expiry", None)
+
+    if PREMIUM_MODE_EXPIRY and isinstance(PREMIUM_MODE_EXPIRY, datetime) and datetime.now() > PREMIUM_MODE_EXPIRY:
+        PREMIUM_MODE = False  # Changed to disable premium mode on expiry
+        PREMIUM_MODE_EXPIRY = None
+        await DARKXSIDE78.global_settings.update_one(
+            {"_id": "premium_mode"},
+            {"$set": {"status": PREMIUM_MODE, "expiry": PREMIUM_MODE_EXPIRY}}
+        )
 @Client.on_message(filters.command("renamed") & (filters.group | filters.private))
 @check_ban_status
 async def renamed_stats(client, message: Message):
@@ -1950,22 +1968,6 @@ async def set_pdf_banner_cb(client, callback_query):
 async def set_pdf_lock_pw_cb(client, callback_query):
     await callback_query.answer("Sᴇɴᴅ /set_pdf_lock <password> ᴛᴏ sᴇᴛ ʏᴏᴜʀ PDF ʟᴏᴄᴋ ᴘᴀssᴡᴏʀᴅ.", show_alert=True)
 
-async def check_premium_mode():
-    global PREMIUM_MODE, PREMIUM_MODE_EXPIRY
-
-    settings = await DARKXSIDE78.global_settings.find_one({"_id": "premium_mode"})
-    if not settings:
-        return
-
-    PREMIUM_MODE        = settings.get("status", True)
-    PREMIUM_MODE_EXPIRY = settings.get("expiry", None)
-
-    if PREMIUM_MODE_EXPIRY and datetime.now() > PREMIUM_MODE_EXPIRY:
-        PREMIUM_MODE = True
-        await DARKXSIDE78.global_settings.update_one(
-            {"_id": "premium_mode"},
-            {"$set": {"status": PREMIUM_MODE}}
-        )
 
 # Initialize
 logger = logging.getLogger(__name__)
