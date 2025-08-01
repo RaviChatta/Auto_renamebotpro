@@ -791,96 +791,6 @@ async def check_premium_mode():
             {"$set": {"status": PREMIUM_MODE}}
         )
 
-
-SEASON_EPISODE_PATTERNS = [
-    (re.compile(r'\[S(\d{1,2})[\s\-]+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),   # [S01-E06]
-    (re.compile(r'\[S(\d{1,2})[\s\-]+(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),     # [S01-06]
-    (re.compile(r'\[S(\d{1,2})\s+E(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')),        # [S01 E06]
-    (re.compile(r'\[S\s*(\d{1,2})\s*E\s*(\d{1,3})\]', re.IGNORECASE), ('season', 'episode')), # [S 1 E 1]
-    (re.compile(r'S(\d{1,2})[\s\-]+E(\d{1,3})', re.IGNORECASE), ('season', 'episode')),        # S01-E06, S01 E06
-    (re.compile(r'S(\d{1,2})[\s\-]+(\d{1,3})', re.IGNORECASE), ('season', 'episode')),         # S01-06, S01 06
-    (re.compile(r'S(\d+)(?:E|EP)(\d+)'), ('season', 'episode')),
-    (re.compile(r'S(\d+)[\s-]*(?:E|EP)(\d+)'), ('season', 'episode')),
-    (re.compile(r'Season\s*(\d+)\s*Episode\s*(\d+)', re.IGNORECASE), ('season', 'episode')),
-    (re.compile(r'\[S(\d+)\]\[E(\d+)\]'), ('season', 'episode')),
-    (re.compile(r'S(\d+)[^\d]+(\d{1,3})\b'), ('season', 'episode')),
-    (re.compile(r'(?:E|EP|Episode)\s*(\d+)', re.IGNORECASE), (None, 'episode')),
-    (re.compile(r'\b(\d{1,3})\b'), (None, 'episode'))
-]
-
-QUALITY_PATTERNS = [
-    (re.compile(r'\[(\d{3,4}p)\](?:\s*\[\1\])*', re.IGNORECASE), lambda m: m.group(1)),
-    (re.compile(r'\b(\d{3,4})p?\b'), lambda m: f"{m.group(1)}p"),
-    (re.compile(r'\b(4k|2160p)\b', re.IGNORECASE), lambda m: "2160p"),
-    (re.compile(r'\b(2k|1440p)\b', re.IGNORECASE), lambda m: "1440p"),
-    (re.compile(r'\b(\d{3,4}[pi])\b', re.IGNORECASE), lambda m: m.group(1)),
-    (re.compile(r'\b(HDRip|HDTV)\b', re.IGNORECASE), lambda m: m.group(1)),
-    (re.compile(r'\b(4kX264|4kx265)\b', re.IGNORECASE), lambda m: m.group(1)),
-    (re.compile(r'\[(\d{3,4}[pi])\]', re.IGNORECASE), lambda m: m.group(1))
-]
-
-def extract_season_episode(filename):
-    """Extract season and episode numbers from filename."""
-    if not filename:
-        return "01", None
-
-    patterns = [
-        (r'\[S(\d{1,2})[\s\-]+E(\d{1,3})\]', ('season', 'episode')),   # [S01-E06]
-        (r'\[S(\d{1,2})[\s\-]+(\d{1,3})\]', ('season', 'episode')),     # [S01-06]
-        (r'\[S(\d{1,2})\s+E(\d{1,3})\]', ('season', 'episode')),        # [S01 E06]
-        (r'\[S\s*(\d{1,2})\s*E\s*(\d{1,3})\]', ('season', 'episode')), # [S 1 E 1]
-        (r'S(\d{1,2})[\s\-]+E(\d{1,3})', ('season', 'episode')),        # S01-E06, S01 E06
-        (r'S(\d{1,2})[\s\-]+(\d{1,3})', ('season', 'episode')),         # S01-06, S01 06
-        (r'S(\d+)(?:E|EP)(\d+)', ('season', 'episode')),
-        (r'S(\d+)[\s-]*(?:E|EP)(\d+)', ('season', 'episode')),
-        (r'Season\s*(\d+)\s*Episode\s*(\d+)', ('season', 'episode')),
-        (r'\[S(\d+)\]\[E(\d+)\]', ('season', 'episode')),
-        (r'S(\d+)[^\d]+(\d{1,3})\b', ('season', 'episode')),
-        (r'(?:E|EP|Episode)\s*(\d+)', (None, 'episode')),
-        (r'\b(\d{1,3})\b', (None, 'episode'))
-    ]
-
-    for pattern, (season_group, episode_group) in patterns:
-        match = pattern.search(filename)
-        if match:
-            season = episode = None
-            if season_group:
-                season = match.group(1).zfill(2) if match.group(1) else "01"
-            if episode_group:
-                episode = match.group(2 if season_group else 1).zfill(2)
-            return season or "01", episode
-    
-    return "01", None
-
-def extract_quality(filename):
-    """Extract quality/resolution from filename."""
-    if not filename:
-        return "Unknown"
-
-    patterns = [
-        (r'\[(\d{3,4}p)\](?:\s*\[\1\])*', lambda m: m.group(1)),
-        (r'\b(\d{3,4})p?\b', lambda m: f"{m.group(1)}p"),
-        (r'\b(4k|2160p)\b', lambda m: "2160p"),
-        (r'\b(2k|1440p)\b', lambda m: "1440p"),
-        (r'\b(\d{3,4}[pi])\b', lambda m: m.group(1)),
-        (r'\b(HDRip|HDTV)\b', lambda m: m.group(1)),
-        (r'\b(4kX264|4kx265)\b', lambda m: m.group(1)),
-        (r'\[(\d{3,4}[pi])\]', lambda m: m.group(1))
-    ]
-
-    seen = set()
-    quality_parts = []
-    
-    for pattern, extractor in patterns:
-        match = pattern.search(filename)
-        if match:
-            quality = extractor(match).lower()
-            if quality not in seen:
-                quality_parts.append(quality)
-                seen.add(quality)
-                filename = filename.replace(match.group(0), '', 1)
-    
-    return " ".join(quality_parts) if quality_parts else "Unknown"
 def clean_and_extract_title(filename):
     """Clean and extract the title from a filename with various patterns."""
     if not filename:
@@ -1029,6 +939,68 @@ def clean_and_extract_title(filename):
     
     return f"{cleaned_name}{ext}".strip()
 
+def extract_season_episode(filename):
+    """Extract season and episode numbers from filename."""
+    if not filename:
+        return "01", None
+
+    patterns = [
+        (r'\[S(\d{1,2})[\s\-]+E(\d{1,3})\]', ('season', 'episode')),   # [S01-E06]
+        (r'\[S(\d{1,2})[\s\-]+(\d{1,3})\]', ('season', 'episode')),     # [S01-06]
+        (r'\[S(\d{1,2})\s+E(\d{1,3})\]', ('season', 'episode')),        # [S01 E06]
+        (r'\[S\s*(\d{1,2})\s*E\s*(\d{1,3})\]', ('season', 'episode')), # [S 1 E 1]
+        (r'S(\d{1,2})[\s\-]+E(\d{1,3})', ('season', 'episode')),        # S01-E06, S01 E06
+        (r'S(\d{1,2})[\s\-]+(\d{1,3})', ('season', 'episode')),         # S01-06, S01 06
+        (r'S(\d+)(?:E|EP)(\d+)', ('season', 'episode')),
+        (r'S(\d+)[\s-]*(?:E|EP)(\d+)', ('season', 'episode')),
+        (r'Season\s*(\d+)\s*Episode\s*(\d+)', ('season', 'episode')),
+        (r'\[S(\d+)\]\[E(\d+)\]', ('season', 'episode')),
+        (r'S(\d+)[^\d]+(\d{1,3})\b', ('season', 'episode')),
+        (r'(?:E|EP|Episode)\s*(\d+)', (None, 'episode')),
+        (r'\b(\d{1,3})\b', (None, 'episode'))
+    ]
+
+    for pattern, (season_group, episode_group) in patterns:
+        match = pattern.search(filename)
+        if match:
+            season = episode = None
+            if season_group:
+                season = match.group(1).zfill(2) if match.group(1) else "01"
+            if episode_group:
+                episode = match.group(2 if season_group else 1).zfill(2)
+            return season or "01", episode
+    
+    return "01", None
+
+def extract_quality(filename):
+    """Extract quality/resolution from filename."""
+    if not filename:
+        return "Unknown"
+
+    patterns = [
+        (r'\[(\d{3,4}p)\](?:\s*\[\1\])*', lambda m: m.group(1)),
+        (r'\b(\d{3,4})p?\b', lambda m: f"{m.group(1)}p"),
+        (r'\b(4k|2160p)\b', lambda m: "2160p"),
+        (r'\b(2k|1440p)\b', lambda m: "1440p"),
+        (r'\b(\d{3,4}[pi])\b', lambda m: m.group(1)),
+        (r'\b(HDRip|HDTV)\b', lambda m: m.group(1)),
+        (r'\b(4kX264|4kx265)\b', lambda m: m.group(1)),
+        (r'\[(\d{3,4}[pi])\]', lambda m: m.group(1))
+    ]
+
+    seen = set()
+    quality_parts = []
+    
+    for pattern, extractor in patterns:
+        match = pattern.search(filename)
+        if match:
+            quality = extractor(match).lower()
+            if quality not in seen:
+                quality_parts.append(quality)
+                seen.add(quality)
+                filename = filename.replace(match.group(0), '', 1)
+    
+    return " ".join(quality_parts) if quality_parts else "Unknown"
 async def detect_audio_info(file_path):
     ffprobe = shutil.which('ffprobe')
     if not ffprobe:
@@ -1314,6 +1286,7 @@ async def convert_to_mkv(input_path, output_path):
     
     return output_path
 
+
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
 @check_ban_status
 async def auto_rename_files(client, message: Message):
@@ -1408,7 +1381,7 @@ async def auto_rename_files(client, message: Message):
             
             season, episode = extract_season_episode(source_text)
             quality = extract_quality(source_text)
-            title = clean_and_extract_title(source_text.split(season or "")[0].split(quality or "")[0].strip())
+            title = clean_and_extract_title(source_text.split(season or "")[0].split(quality or "")[0].strip()
 
             if not format_template:
                 return await message.reply_text("**Auto rename format not set\nPlease set a rename format using /autorename**")
