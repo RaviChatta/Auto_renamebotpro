@@ -6,7 +6,7 @@ id_pattern = re.compile(r'^.\d+$')
 class Config(object):
     API_ID    = os.environ.get("API_ID", "22817133")
     API_HASH  = os.environ.get("API_HASH", "65b44989de9accc59c64691b308da0f7")
-    BOT_TOKEN = os.environ.get("BOT_TOKEN", "7790118521:AAGU9I8-2BA7_0mPQUZabXryBwEVuDXKvzM") 
+    BOT_TOKEN = os.environ.get("BOT_TOKEN", "7790118521:AAFxlfDxtO83-rzvTlCbnug3OA68IJly-Ak") 
 
     DB_NAME = os.environ.get("DB_NAME","Cluster0")     
     DB_URL  = os.environ.get("DB_URL","mongodb+srv://gd3251791:qAFhXxHXPkaNxw9u@cluster0.mr2u1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
