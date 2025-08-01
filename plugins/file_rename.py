@@ -1381,7 +1381,7 @@ async def auto_rename_files(client, message: Message):
             
             season, episode = extract_season_episode(source_text)
             quality = extract_quality(source_text)
-            title = clean_and_extract_title(source_text.split(season or "")[0].split(quality or "")[0].strip()
+            title = clean_and_extract_title(source_text.split(season or "")[0].split(quality or "")[0].strip())
 
             if not format_template:
                 return await message.reply_text("**Auto rename format not set\nPlease set a rename format using /autorename**")
